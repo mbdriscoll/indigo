@@ -11,7 +11,7 @@ BACKENDS = available_backends()
 
 @pytest.mark.parametrize("backend,N,K",
     product( BACKENDS, [23,45], [1,2,3] ) )
-def test_compat_Multiply(backend, N,K):
+def test_compat_Multiply(backend, N, K):
     pymr = pytest.importorskip('pymr')
     b = backend()
     x = slo.util.rand64c(N,K)
@@ -23,4 +23,25 @@ def test_compat_Multiply(backend, N,K):
     y_exp = pymr.util.reshape(D0 * pymr.util.vec(x), (N,K))
     y_act = D1 * x
 
+    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+
+
+@pytest.mark.parametrize("backend,X,Y,Z,P,K",
+    product( BACKENDS, [23,44], [23,44], [23,44], [1,2,3], [1,2,3] ) )
+def test_compat_Zpad(backend, X,Y,Z, P, K):
+    pymr = pytest.importorskip('pymr')
+    b = backend()
+
+    i_shape = (X, Y, Z, K)
+    o_shape = (X+2*P, Y+2*P, Z+2*P, K)
+
+    x = slo.util.rand64c( *i_shape )
+
+    D0 = pymr.linop.Zpad( o_shape, i_shape, dtype=x.dtype )
+    D1 = b.Zpad(o_shape[:3], i_shape[:3], dtype=x.dtype)
+
+    y_exp = D0 * pymr.util.vec(x)
+    y_act = D1 * x.reshape((X*Y*Z,K), order='F')
+
+    y_act = y_act.flatten(order='F')
     npt.assert_allclose(y_act, y_exp, rtol=1e-5)

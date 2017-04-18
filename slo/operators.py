@@ -49,8 +49,9 @@ class Operator(object):
             return Product(self._backend, self, other)
         elif isinstance(other, np.ndarray):
             log.warn("using slow evaluation interface")
-            x_d = self._backend.copy_array(other)
-            y_d = self._backend.zero_array( (self.shape[0],other.shape[1]), dtype=other.dtype )
+            x = other.reshape( (self.shape[1], -1), order='F' )
+            x_d = self._backend.copy_array(x)
+            y_d = self._backend.zero_array( (self.shape[0],other.shape[-1]), dtype=other.dtype )
             self.eval(y_d, x_d)
             return y_d.to_host()
         else:
