@@ -45,8 +45,16 @@ class Operator(object):
         return self._stream
 
     def __mul__(self, other):
-        assert isinstance(other, Operator)
-        return Product(self._backend, self, other)
+        if isinstance(other, Operator):
+            return Product(self._backend, self, other)
+        elif isinstance(other, np.ndarray):
+            x_d = self._backend.copy_array(other)
+            y_d = self._backend.zero_array( (self.shape[0],1), dtype=other.dtype )
+            self.eval(y_d, x_d)
+            return y_d.to_host()
+        else:
+            raise ValueError("Cannot multiply Operator by %s" % type(other))
+            
 
     @property
     def H(self):

@@ -2,23 +2,17 @@ import pytest
 import numpy as np
 import scipy.sparse as spp
 import numpy.testing as npt
-from numpy.fft import fftshift, ifftshift, fftn, ifftn
 from itertools import product
 
+import slo
 from slo.backends import available_backends
-
 BACKENDS = available_backends()
-
-def rand_mat(M, N, density):
-    A_r = spp.random(M, N, density=density, format='csr', dtype=np.float32)
-    A_i = spp.random(M, N, density=density, format='csr', dtype=np.float32)
-    return (A_r + 1j * A_i).astype(np.dtype('complex64'))
 
 @pytest.mark.parametrize("backend,M,N,K,density",
     product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0.01,0.1,0.5,1] ))
 def test_SpMatrix(backend, M, N, K, density):
     b = backend()
-    A_h = rand_mat(M, N, density)
+    A_h = slo.util.randM(M, N, density)
     A = b.SpMatrix(A_h)
 
     # forward
@@ -65,8 +59,8 @@ def test_SpMatrix(backend, M, N, K, density):
     product( BACKENDS, [3,4], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
 def test_Product(backend, L, M, N, K, density):
     b = backend()
-    A0_h = rand_mat(L, M, density)
-    A1_h = rand_mat(M, N, density)
+    A0_h = slo.util.randM(L, M, density)
+    A1_h = slo.util.randM(M, N, density)
     A0 = b.SpMatrix(A0_h, name='A0')
     A1 = b.SpMatrix(A1_h, name='A1')
     A = A0 * A1
@@ -103,7 +97,7 @@ def test_Product(backend, L, M, N, K, density):
     product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
 def test_VStack(backend, stack, M, N, K, density):
     b = backend()
-    mats_h = [rand_mat(M,N,density) for i in range(stack)]
+    mats_h = [slo.util.randM(M,N,density) for i in range(stack)]
     A_h = spp.vstack(mats_h)
 
     mats_d = [b.SpMatrix(m) for m in mats_h]
@@ -137,7 +131,7 @@ def test_VStack(backend, stack, M, N, K, density):
     product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
 def test_BlockDiag(backend, stack, M, N, K, density):
     b = backend()
-    mats_h = [rand_mat(M,N,density) for i in range(stack)]
+    mats_h = [slo.util.randM(M,N,density) for i in range(stack)]
     A_h = spp.block_diag(mats_h)
 
     mats_d = [b.SpMatrix(m) for m in mats_h]
@@ -171,7 +165,7 @@ def test_BlockDiag(backend, stack, M, N, K, density):
     product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
 def test_KronI(backend, stack, M, N, K, density):
     b = backend()
-    mat_h = rand_mat(M,N,density)
+    mat_h = slo.util.randM(M,N,density)
     A_h = spp.kron( spp.eye(stack), mat_h )
 
     mat_d = b.SpMatrix(mat_h)
@@ -206,7 +200,7 @@ def test_KronI(backend, stack, M, N, K, density):
     product( BACKENDS, [22], [23], [1,8], [0.5,1], [-2,0,0.5,1], [-2,0,0.5,1]))
 def test_SpMatrix_alpha_beta(backend, M, N, K, density, alpha, beta):
     b = backend()
-    A_h = rand_mat(M, N, density)
+    A_h = slo.util.randM(M, N, density)
     A = b.SpMatrix(A_h)
 
     # forward
@@ -282,6 +276,8 @@ def test_UnitaryFFT(backend, M, N, K, B ):
     product( BACKENDS, [22,23,24], [22,23,24], [22,23,24], [1,2,3,8])
 )
 def test_CenteredFFT(backend, M, N, K, B ):
+    from numpy.fft import fftshift, ifftshift, fftn, ifftn
+
     b = backend()
     C, S, F, C = b.FFTc( (M,N,K), dtype=np.dtype('complex64') )
     A = C * S * F * C
@@ -379,7 +375,7 @@ def test_interp(backend, batch, x, y, z, ro, tr):
     product( BACKENDS, [1,2,4,8], [3,4],[3,4], [4,5],[3,6] )
 )
 def test_nested_kroni(backend, batch, M, N, c1, c2):
-    A00_h = rand_mat(M, N, 0.9)
+    A00_h = slo.util.randM(M, N, 0.9)
     A0_h = spp.kron( spp.eye(c1), A00_h )
     A_h = spp.kron( spp.eye(c2), A0_h )
 

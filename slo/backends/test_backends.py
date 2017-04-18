@@ -1,5 +1,3 @@
-import gc
-import time
 import pytest
 import logging
 import numpy as np
@@ -207,7 +205,7 @@ def test_blas_scale(backend, alpha, n, alpha_i):
 
 
 @pytest.mark.parametrize("backend,device,n",
-    product(BACKENDS, [0,1,2,3], [10,23,129])
+    product(BACKENDS, [0], [10,23,129])
 )
 def test_blas_nrm2(backend, device, n):
     b = backend(device)
