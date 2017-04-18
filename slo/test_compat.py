@@ -9,20 +9,18 @@ from slo.backends import available_backends
 BACKENDS = available_backends()
 
 
-@pytest.mark.parametrize("backend,N",
-    product( BACKENDS, [23,45] ) )
-def test_compat_Multiply(backend, N):
+@pytest.mark.parametrize("backend,N,K",
+    product( BACKENDS, [23,45], [1,2,3] ) )
+def test_compat_Multiply(backend, N,K):
     pymr = pytest.importorskip('pymr')
     b = backend()
-    x = slo.util.rand64c(N,1)
+    x = slo.util.rand64c(N,K)
     d = slo.util.rand64c(N,1)
 
-    y_exp = x * d
-
-    D0 = pymr.linop.Multiply( (N,1), (N,1), d, dtype=d.dtype )
-    y_act0 = D0 * x
-    npt.assert_allclose(y_act0, y_exp, rtol=1e-5)
-
+    D0 = pymr.linop.Multiply( (N,K), (N,K), d, dtype=d.dtype )
     D1 = b.Diag(d)
-    y_act1 = D1 * x
-    npt.assert_allclose(y_act1, y_exp, rtol=1e-5)
+
+    y_exp = pymr.util.reshape(D0 * pymr.util.vec(x), (N,K))
+    y_act = D1 * x
+
+    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
