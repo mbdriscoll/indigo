@@ -23,14 +23,14 @@ class c_complex(c_float * 2):
         self[0] = a.real
         self[1] = a.imag
 
-class CUDA(Backend):
+class CudaBackend(Backend):
 
     def __init__(self, device_id=0):
         self._fft_plans = dict()
 
-        self._cublas_handle = CUDA.cublasHandle_t(self)
-        self._cusparse_handle = CUDA.cusparseHandle_t(self)
-        self._mat_descr = CUDA.cusparseMatDescr_t(self)
+        self._cublas_handle = self.cublasHandle_t(self)
+        self._cusparse_handle = self.cusparseHandle_t(self)
+        self._mat_descr = self.cusparseMatDescr_t(self)
 
         self.cudaSetDevice( device_id )
         cu_device = c_int()
@@ -224,20 +224,20 @@ class CUDA(Backend):
     class dndarray(Backend.dndarray):
         def _copy_from(self, arr, stream=0):
             src, dst = arr.ctypes.data, self._arr
-            size, kind = arr.nbytes, CUDA.cudaMemcpy.HostToDevice
+            size, kind = arr.nbytes, CudaBackend.cudaMemcpy.HostToDevice
             self._backend.cudaMemcpy(dst, src, size, kind)
             #self._backend.cudaMemcpyAsync(dst, src, size, kind, stream)
 
         def _copy_to(self, arr, stream=0):
             assert arr.flags['F_CONTIGUOUS']
             src, dst = self._arr, arr.ctypes.data
-            size, kind = arr.nbytes, CUDA.cudaMemcpy.DeviceToHost
+            size, kind = arr.nbytes, CudaBackend.cudaMemcpy.DeviceToHost
             self._backend.cudaMemcpy(dst, src, size, kind)
             #self._backend.cudaMemcpyAsync(dst, src, size, kind, stream)
 
         def _copy(self, d_arr, stream=0):
             src, dst = d_arr._arr, self._arr
-            size, kind = self.nbytes, CUDA.cudaMemcpy.DeviceToDevice
+            size, kind = self.nbytes, CudaBackend.cudaMemcpy.DeviceToDevice
             self._backend.cudaMemcpy(dst, src, size, kind)
             #self._backend.cudaMemcpyAsync(dst, src, size, kind, stream)
 
@@ -274,7 +274,7 @@ class CUDA(Backend):
 
         @staticmethod
         def from_param(obj):
-            if not isinstance(obj, CUDA.dndarray):
+            if not isinstance(obj, CudaBackend.dndarray):
                 raise ArgumentError('{} is not a dndarray'.format( type(obj) ))
             return obj._arr
 
@@ -385,7 +385,7 @@ class CUDA(Backend):
 
     class cufftHandle_t(c_int):
         def __init__(self, backend):
-            super(CUDA.cufftHandle_t, self).__init__()
+            super(CudaBackend.cufftHandle_t, self).__init__()
             self._backend = backend
             self._backend.cufftCreate( byref(self) )
 
@@ -460,21 +460,21 @@ class CUDA(Backend):
             N = x.shape[:3][::-1]
             dims = (c_int*3)(*N)
             batch = c_int(x.size // np.prod(N))
-            plan = CUDA.cufftHandle_t(self)
+            plan = CudaBackend.cufftHandle_t(self)
             self.cufftPlanMany(byref(plan), 3, byref(dims),
-                None, 0, 0, None, 0, 0, CUDA.CUFFT_C2C, batch)
+                None, 0, 0, None, 0, 0, CudaBackend.CUFFT_C2C, batch)
             self._fft_plans[key] = plan
         return self._fft_plans[key]
 
     def fftn(self, y, x, stream=0):
         plan = self._get_or_create_plan(x)
         self.cufftSetStream(plan, stream)
-        self.cufftExecC2C(plan, x, y, CUDA.CUFFT_FORWARD)
+        self.cufftExecC2C(plan, x, y, CudaBackend.CUFFT_FORWARD)
 
     def ifftn(self, y, x, stream=0):
         plan = self._get_or_create_plan(x)
         self.cufftSetStream(plan, stream)
-        self.cufftExecC2C(plan, x, y, CUDA.CUFFT_INVERSE)
+        self.cufftExecC2C(plan, x, y, CudaBackend.CUFFT_INVERSE)
 
     # -----------------------------------------------------------------------
     # Cusparse
@@ -571,9 +571,9 @@ class CUDA(Backend):
         ldx = x._leading_dims[0]
         ldy = y._leading_dims[0]
         if adjoint:
-            trans = CUDA.CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
+            trans = self.CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
         else:
-            trans = CUDA.CUSPARSE_OPERATION_NON_TRANSPOSE
+            trans = self.CUSPARSE_OPERATION_NON_TRANSPOSE
         alpha = c_complex(alpha)
         beta  = c_complex(beta)
         self.cusparseSetStream( self._cusparse_handle, stream )
