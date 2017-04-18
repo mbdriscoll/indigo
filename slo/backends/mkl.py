@@ -9,7 +9,7 @@ from .backend import Backend
 
 libmkl_rt = cdll.LoadLibrary("libmkl_rt.so")
 
-class MKL(Backend):
+class MklBackend(Backend):
 
     def __init__(self, device_id=0):
         self._fft_descs = dict()
@@ -58,7 +58,7 @@ class MKL(Backend):
 
         @staticmethod
         def from_param(obj):
-            if not isinstance(obj, MKL.dndarray):
+            if not isinstance(obj, MklBackend.dndarray):
                 raise ArgumentError('{} is not a dndarray'.format( type(obj) ))
             return obj._arr.ctypes.get_as_parameter()
 
@@ -159,14 +159,14 @@ class MKL(Backend):
         if key not in self._fft_descs:
             N = x.shape[:3][::-1]
             batch = int(x.size / np.prod(N))
-            desc = MKL.DFTI_DESCRIPTOR_HANDLE()
+            desc = self.DFTI_DESCRIPTOR_HANDLE()
             lengths = (c_long*3)(*N)
             self.DftiCreateDescriptor( byref(desc),
-                MKL.DFTI_SINGLE, MKL.DFTI_COMPLEX, 3, lengths)
-            self.DftiSetValue( desc, MKL.DFTI_NUMBER_OF_TRANSFORMS, batch )
-            self.DftiSetValue( desc, MKL.DFTI_PLACEMENT, MKL.DFTI_NOT_INPLACE )
-            self.DftiSetValue( desc, MKL.DFTI_INPUT_DISTANCE, np.prod(N) )
-            self.DftiSetValue( desc, MKL.DFTI_OUTPUT_DISTANCE, np.prod(N) )
+                self.DFTI_SINGLE, self.DFTI_COMPLEX, 3, lengths)
+            self.DftiSetValue( desc, self.DFTI_NUMBER_OF_TRANSFORMS, batch )
+            self.DftiSetValue( desc, self.DFTI_PLACEMENT, self.DFTI_NOT_INPLACE )
+            self.DftiSetValue( desc, self.DFTI_INPUT_DISTANCE, np.prod(N) )
+            self.DftiSetValue( desc, self.DFTI_OUTPUT_DISTANCE, np.prod(N) )
             self.DftiCommitDescriptor( desc )
             self._fft_descs[key] = desc
         return self._fft_descs[key]
