@@ -320,7 +320,7 @@ class Backend(object):
         npts = np.prod( coord.shape[1:] )
         coord = coord.reshape((ndim,-1), order='F')
 
-        from pymr.interp import interp_mat
+        from slo.interp import interp_mat
         M = interp_mat(npts, N, width, table, coord, 1).astype(dtype)
 
         return self.SpMatrix(M, **kwargs)

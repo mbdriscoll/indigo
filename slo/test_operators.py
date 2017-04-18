@@ -5,7 +5,7 @@ import numpy.testing as npt
 from numpy.fft import fftshift, ifftshift, fftn, ifftn
 from itertools import product
 
-from pymr.backends import available_backends
+from slo.backends import available_backends
 
 BACKENDS = available_backends()
 

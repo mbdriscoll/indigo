@@ -6,8 +6,8 @@ import scipy.sparse as spp
 from itertools import repeat, combinations
 from collections import defaultdict
 
-from pymr.backends import oracle
-from pymr.backends.operators import (
+from slo import oracle
+from slo.operators import (
     CompositeOperator, Product,
     KronI, BlockDiag,
     VStack, SpMatrix

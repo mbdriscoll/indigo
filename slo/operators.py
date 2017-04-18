@@ -73,7 +73,7 @@ class Operator(object):
             shape=self.shape, dtype=self.dtype), file=file)
 
     def optimize(self):
-        from pymr.backends.transforms import Optimize
+        from slo.transforms import Optimize
         return Optimize().visit(self)
 
 
