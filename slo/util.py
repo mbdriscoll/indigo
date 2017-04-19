@@ -9,6 +9,7 @@ def rand64c(*shape):
     r = np.random.rand(*shape).astype(np.float32)
     i = np.random.rand(*shape).astype(np.float32)
     arr = (r + 1j*i).astype(np.complex64)
+    arr = np.asfortranarray(arr)
     return arr
 
 
