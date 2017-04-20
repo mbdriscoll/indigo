@@ -325,7 +325,7 @@ class Backend(object):
 
         return self.SpMatrix(M, **kwargs)
 
-    def NUFFT(self, M, N, coord, width=3, n=128, oversamp=1.43, dtype=np.dtype('complex64'), **kwargs):
+    def NUFFT(self, M, N, coord, width=3, n=128, oversamp=1.375, dtype=np.dtype('complex64'), **kwargs):
         assert len(M) == 3
         assert len(N) == 3
         assert M[1:] == coord.shape[1:]
@@ -452,7 +452,7 @@ class Backend(object):
     # Algorithms
     # -----------------------------------------------------------------------
 
-    def cg(self, A, b_h, x_h, lamda=0.0, tol=1e-10, maxiter=100, teams=None):
+    def cg(self, A, b_h, x_h, lamda=0.0, tol=1e-10, maxiter=100, team=None):
         '''Conjugate gradient.
         Solves for A x = b, where A is positive semi-definite
 
@@ -479,7 +479,7 @@ class Backend(object):
         self.axpy(r, -lamda, x)
 
         p = r.copy(name='p')
-        rr = self.pnorm2(r, teams[dim.TIME])
+        rr = self.pnorm2(r, team)
         r0 = rr
 
         times = []
@@ -488,11 +488,11 @@ class Backend(object):
             t = time.time()
             A.eval(Ap, p)
             self.axpy(Ap, lamda, p)
-            alpha = rr / self.pdot(p, Ap, teams[dim.TIME])
+            alpha = rr / self.pdot(p, Ap, team)
             self.axpy(x, alpha, p)
             self.axpy(r, -alpha, Ap)
 
-            r2 = self.pnorm2(r, teams[dim.TIME])
+            r2 = self.pnorm2(r, team)
             beta = r2 / rr
             self.scale(p, beta)
             self.axpy(p, 1, r)
@@ -517,7 +517,7 @@ class Backend(object):
 
         return x_h
 
-    def apgd(self, gradf, proxg, alpha, x_h, maxiter=100, teams=None):
+    def apgd(self, gradf, proxg, alpha, x_h, maxiter=100, team=None):
         '''Accelerated proximal gradient descent.
         Solves for min_x f(x) + g(x)
 
@@ -553,7 +553,7 @@ class Backend(object):
             self.axpy(z, (s-1)/t, x) # z += (s-1)/t*x
             self.axpy(z, (1-s)/t, o) # z += (1-s)/t*o
 
-            r2 = self.pnorm2(x, teams[dim.TIME])
+            r2 = self.pnorm2(x, team)
             log.info("iter %d, residual %g", it, r2.real)
 
         x.copy_to(x_h)

@@ -27,7 +27,7 @@ def test_compat_Multiply(backend, N, K):
 
 
 @pytest.mark.parametrize("backend,X,Y,Z,P,K",
-    product( BACKENDS, [23,44], [23,44], [23,44], [1,2,3], [1,2,3] ) )
+    product( BACKENDS, [23,32], [23,32], [23,32], [1,2,3], [1,2,3] ) )
 def test_compat_Zpad(backend, X,Y,Z, P, K):
     pymr = pytest.importorskip('pymr')
     b = backend()
@@ -40,8 +40,10 @@ def test_compat_Zpad(backend, X,Y,Z, P, K):
     D0 = pymr.linop.Zpad( o_shape, i_shape, dtype=x.dtype )
     D1 = b.Zpad(o_shape[:3], i_shape[:3], dtype=x.dtype)
 
-    y_exp = D0 * pymr.util.vec(x)
-    y_act = D1 * x.reshape((-1,K), order='F')
+    x_slo = np.asfortranarray(x.reshape((-1,K), order='F'))
+    x_pmr = pymr.util.vec(x)
+    y_exp = D0 * x_pmr
+    y_act = D1 * x_slo
 
     y_act = y_act.flatten(order='F')
     npt.assert_allclose(y_act, y_exp, rtol=1e-5)
@@ -103,4 +105,102 @@ def test_compat_CenteredFFT(backend, X,Y,Z, K):
     y_act = D1 * x.reshape((-1,K), order='F')
 
     y_act = y_act.flatten(order='F')
-    npt.assert_allclose(abs(y_act), abs(y_exp), rtol=1e-2)
+    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+
+
+@pytest.mark.parametrize("backend,X,Y,Z,RO,PS,K,oversamp,n,width",
+    product( BACKENDS, [23,44], [23,44], [23,44], [33,34], [35,36], [1,2,3], [1.2, 1.375, 1.56, 1.43], [64,128], [3,4] ) )
+def test_compat_NUFFT(backend, X, Y, Z, RO, PS, K, oversamp, n, width):
+    pymr = pytest.importorskip('pymr')
+    b = backend()
+
+    c_dims  = (X, Y, Z, K)
+    nc_dims = (1, RO, PS, K)
+    t_dims  = (3, RO, PS)
+
+    x = slo.util.rand64c(*c_dims)
+    traj = slo.util.rand64c( *t_dims ).real - 0.5
+    kwargs = dict(oversamp=oversamp, width=width, n=n, dtype=x.dtype)
+
+    G0 = pymr.linop.NUFFT(nc_dims, c_dims, traj, **kwargs)
+    G_t, Mk, S, F, Mx, Z, R = b.NUFFT(nc_dims[:3], c_dims[:3], traj, **kwargs)
+    G1 = G_t * Mk * S * F * Mx * Z * R
+
+    x_slo = np.asfortranarray(x.reshape((-1,K), order='F'))
+    x_pmr = pymr.util.vec(x)
+    y_exp = G0 * x_pmr
+    y_act = G1 * x_slo
+
+    y_act = y_act.reshape(-1, order='F')
+    npt.assert_allclose( y_act, y_exp, rtol=1e-1)
+
+
+@pytest.mark.parametrize("backend,X,Y,Z,RO,PS,K,n,width,oversamp",
+    product( BACKENDS, [23,44], [23,44], [23,44], [33,34], [35,36], [1,2,3], [64,128], [3,4], [1.375, 1.43] ) )
+def test_compat_Interp(backend, X, Y, Z, RO, PS, K, n, width, oversamp):
+    pymr = pytest.importorskip('pymr')
+    b = backend()
+
+    N = (X, Y, Z, K)
+    M = (1, RO, PS, K)
+    T = (3, RO, PS, 1)
+
+    import scipy.signal as signal
+    beta = 0.1234
+    kb = signal.kaiser(2 * n + 1, beta)[n:]
+
+    x = slo.util.rand64c(*N)
+    traj = slo.util.rand64c(*T).real - 0.5
+
+    G0 = pymr.linop.Interp(M, N, traj, width, kb, dtype=x.dtype)
+    y_exp = G0 * pymr.util.vec(x)
+
+    G1 = b.Interp(N[:3], traj, width, kb, dtype=x.dtype)
+    y_act = G1 * x.reshape((-1,K), order='F')
+
+    y_act = y_act.flatten(order='F')
+    npt.assert_allclose( y_act, y_exp, rtol=1e-2)
+
+
+@pytest.mark.parametrize("backend,forward,X",
+    product( BACKENDS, [True,False], [1,2] ))
+def test_compat_SENSE(backend, forward, X):
+    pymr = pytest.importorskip('pymr')
+    b = backend()
+
+    X, Y, Z = 12, 13, 14
+    RO, PS, C = 15, 16, 3
+
+    img = slo.util.rand64c(X, Y, Z, 1, 1)
+    mps = slo.util.rand64c(X, Y, Z, C, 1)
+    ksp = slo.util.rand64c(1, RO, PS, C, 1)
+    dcf = slo.util.rand64c(1, RO, PS, 1, 1).real
+    coord=slo.util.rand64c(3, RO, PS).real - 0.5
+
+    # check pymr
+    P = pymr.linop.Multiply(ksp.shape, ksp.shape, dcf, dtype=img.dtype)
+    F = pymr.linop.NUFFT(ksp.shape, mps.shape,  coord, dtype=img.dtype)
+    S = pymr.linop.Multiply(mps.shape, img.shape, mps, dtype=img.dtype)
+    A_pmr = P * F * S
+
+    # check slo
+    G, Mk, U, F1, Mx, Z, R = b.NUFFT(ksp.shape[:3], mps.shape[:3], coord, dtype=img.dtype)
+    P1 = b.Diag( dcf, name='dcf' )
+
+    S = b.VStack([ Mx * Z * R * b.Diag(mps[:,:,:,c]) for c in range(C) ])
+    F = b.KronI(C, F1, name='fft')
+    P = b.KronI(C, P1 * G * Mk * U)
+    A_slo = P * F * S
+
+    # check adjoints
+    if forward:
+        exp = A_pmr * pymr.util.vec(img)
+        act = A_slo * img.reshape( (-1,1), order='F' )
+    else:
+        exp = A_pmr.H * pymr.util.vec(ksp)
+        act = A_slo.H * ksp.reshape( (-1,1), order='F' )
+
+    act = act.flatten(order='F')
+    npt.assert_allclose( abs(act), abs(exp), rtol=1e-2) # FIXME remove abs
+
+# TODO test_compat_CG
