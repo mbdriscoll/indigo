@@ -169,22 +169,22 @@ def test_compat_SENSE(backend, forward, X):
     b = backend()
 
     X, Y, Z = 12, 13, 14
-    RO, PS, C = 15, 16, 3
+    RO, PS, C, T = 15, 16, 3, 1
 
-    img = slo.util.rand64c(X, Y, Z, 1, 1)
-    mps = slo.util.rand64c(X, Y, Z, C, 1)
-    ksp = slo.util.rand64c(1, RO, PS, C, 1)
-    dcf = slo.util.rand64c(1, RO, PS, 1, 1).real
-    coord=slo.util.rand64c(3, RO, PS).real - 0.5
+    img = slo.util.rand64c(X,  Y,  Z, 1, T)
+    mps = slo.util.rand64c(X,  Y,  Z, C, 1)
+    ksp = slo.util.rand64c(1, RO, PS, C, T)
+    dcf = slo.util.rand64c(1, RO, PS, 1, T).real
+    coord=slo.util.rand64c(3, RO, PS, 1, T).real - 0.5
 
-    # check pymr
+    # pymr
     P = pymr.linop.Multiply(ksp.shape, ksp.shape, dcf, dtype=img.dtype)
     F = pymr.linop.NUFFT(ksp.shape, mps.shape,  coord, dtype=img.dtype)
     S = pymr.linop.Multiply(mps.shape, img.shape, mps, dtype=img.dtype)
     A_pmr = P * F * S
 
-    # check slo
-    G, Mk, U, F1, Mx, Z, R = b.NUFFT(ksp.shape[:3], mps.shape[:3], coord, dtype=img.dtype)
+    # slo
+    G, Mk, U, F1, Mx, Z, R = b.NUFFT(ksp.shape[:3], mps.shape[:3], coord[...,0,0], dtype=img.dtype)
     P1 = b.Diag( dcf, name='dcf' )
 
     S = b.VStack([ Mx * Z * R * b.Diag(mps[:,:,:,c]) for c in range(C) ])
@@ -192,7 +192,7 @@ def test_compat_SENSE(backend, forward, X):
     P = b.KronI(C, P1 * G * Mk * U)
     A_slo = P * F * S
 
-    # check adjoints
+    # check
     if forward:
         exp = A_pmr * pymr.util.vec(img)
         act = A_slo * img.reshape( (-1,1), order='F' )
@@ -201,6 +201,6 @@ def test_compat_SENSE(backend, forward, X):
         act = A_slo.H * ksp.reshape( (-1,1), order='F' )
 
     act = act.flatten(order='F')
-    npt.assert_allclose( abs(act), abs(exp), rtol=1e-2) # FIXME remove abs
+    npt.assert_allclose(act, exp, rtol=1e-2)
 
 # TODO test_compat_CG
