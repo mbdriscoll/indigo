@@ -105,7 +105,7 @@ def test_compat_CenteredFFT(backend, X,Y,Z, K):
     y_act = D1 * x.reshape((-1,K), order='F')
 
     y_act = y_act.flatten(order='F')
-    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+    npt.assert_allclose(abs(y_act), abs(y_exp), rtol=1e-2)
 
 
 @pytest.mark.parametrize("backend,X,Y,Z,RO,PS,K,oversamp,n,width",
@@ -123,6 +123,7 @@ def test_compat_NUFFT(backend, X, Y, Z, RO, PS, K, oversamp, n, width):
     kwargs = dict(oversamp=oversamp, width=width, n=n, dtype=x.dtype)
 
     G0 = pymr.linop.NUFFT(nc_dims, c_dims, traj, **kwargs)
+
     G_t, Mk, S, F, Mx, Z, R = b.NUFFT(nc_dims[:3], c_dims[:3], traj, **kwargs)
     G1 = G_t * Mk * S * F * Mx * Z * R
 
@@ -132,7 +133,7 @@ def test_compat_NUFFT(backend, X, Y, Z, RO, PS, K, oversamp, n, width):
     y_act = G1 * x_slo
 
     y_act = y_act.reshape(-1, order='F')
-    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+    npt.assert_allclose(abs(y_act), abs(y_exp), rtol=1e-2)
 
 
 @pytest.mark.parametrize("backend,X,Y,Z,RO,PS,K,n,width",
@@ -143,7 +144,7 @@ def test_compat_Interp(backend, X, Y, Z, RO, PS, K, n, width):
 
     N = (X, Y, Z, K)
     M = (1, RO, PS, K)
-    T = (3, RO, PS, 1)
+    T = (3, RO, PS)
 
     import scipy.signal as signal
     beta = 0.1234
@@ -214,7 +215,7 @@ def test_compat_conjgrad(backend, N):
     y = slo.util.rand64c( N )
     x0 = np.zeros( N, dtype=np.complex64 )
 
-    A_pmr = pymr.linop.Matrix( A.todense(), dtype=A.dtype )
+    A_pmr = pymr.linop.Matrix( A.toarray(), dtype=A.dtype )
     x_exp = pymr.alg.cg(A_pmr, A.H * y, x0, maxiter=40)
 
     A_slo = b.SpMatrix(A)
