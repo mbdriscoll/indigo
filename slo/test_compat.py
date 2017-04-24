@@ -203,4 +203,22 @@ def test_compat_SENSE(backend, forward, os):
     act = act.flatten(order='F')
     npt.assert_allclose(act, exp, rtol=1e-2)
 
-# TODO test_compat_CG
+@pytest.mark.parametrize("backend,N",
+    product( BACKENDS, [120,130,140] ))
+def test_compat_conjgrad(backend, N):
+    pymr = pytest.importorskip('pymr')
+    b = backend()
+
+    A = slo.util.randM( N, N, 0.5 )
+    A = A.H @ A
+    y = slo.util.rand64c( N )
+    x0 = np.zeros( N, dtype=np.complex64 )
+
+    A_pmr = pymr.linop.Matrix( A.todense(), dtype=A.dtype )
+    x_exp = pymr.alg.cg(A_pmr, A.H * y, x0, maxiter=40)
+
+    A_slo = b.SpMatrix(A)
+    b.cg(A_slo, y, x0, maxiter=40)
+    x_act = x0.copy()
+
+    npt.assert_allclose(x_act, x_exp, rtol=1e-6)
