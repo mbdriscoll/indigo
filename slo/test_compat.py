@@ -222,3 +222,17 @@ def test_compat_conjgrad(backend, N):
     x_act = x0.copy()
 
     npt.assert_allclose(x_act, x_exp, rtol=1e-6)
+
+
+@pytest.mark.parametrize("oversamp,width,beta,X,Y,Z",
+    product( [1.2,3.4], [3,4], [.1,1.1], [12,13], [14,15], [16,17] ))
+def test_compat_rolloff(oversamp, width, beta, X, Y, Z):
+    pymr = pytest.importorskip('pymr')
+    N = (X,Y,Z)
+
+    from pymr.noncart import rolloff3 as pymr_rolloff3
+    from slo.noncart import rolloff3 as slo_rolloff3
+
+    r_exp = pymr_rolloff3(oversamp, width, beta, N)
+    r_act =  slo_rolloff3(oversamp, width, beta, N)
+    npt.assert_allclose(r_exp, r_act)

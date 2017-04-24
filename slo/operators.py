@@ -140,13 +140,6 @@ class SpMatrix(Operator):
     def __init__(self, backend, M, **kwargs):
         """
         Create a new Sparse Matrix Operator from a concrete sparse matrix.
-
-        Parameters
-        ----------
-        backend : pymr.backends.Backend
-            Backend instance.
-        M : scipy.sparse.csr_matrix
-            Sparse Matrix in forward configuration.
         """
         super().__init__(backend, **kwargs)
         assert isinstance(M, spp.spmatrix)

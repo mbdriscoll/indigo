@@ -23,7 +23,7 @@ class Backend(object):
 
         Parameters
         ----------
-        backend : pymr.backends.Backend
+        backend : slo.backends.Backend
             Backend instance.
         shape : tuple
             Array shape, a la numpy.
@@ -35,11 +35,6 @@ class Backend(object):
             True if this object malloc'ed the underlying memory.
         data : ?
             Handle to underlying memory.
-
-        See Also
-        --------
-        `pymr.backends.Backend.copy_array`
-        `pymr.backends.Backend.zero_array`
         """
         __metaclass__ = abc.ABCMeta
         _memory = dict()
@@ -331,8 +326,7 @@ class Backend(object):
         assert M[1:] == coord.shape[1:]
 
         import scipy.signal as signal
-        from pymr.noncart import rolloff2, rolloff3
-
+        from slo.noncart import rolloff3
         ndim  = coord.shape[0]
         npts  = np.prod( coord.shape[1:] )
 
@@ -404,11 +398,6 @@ class Backend(object):
     def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha=1, beta=0, adjoint=False, stream=None):
         """
         Computes Y[:] = A * X.
-
-        See Also
-        ========
-            `pymr.backends.SpMatrix` : Loads a `scipy.sparse.spmatrix` into
-                this backend.
         """
         raise NotImplementedError()
 
