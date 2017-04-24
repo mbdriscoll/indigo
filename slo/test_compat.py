@@ -46,7 +46,7 @@ def test_compat_Zpad(backend, X,Y,Z, P, K):
     y_act = D1 * x_slo
 
     y_act = y_act.flatten(order='F')
-    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+    npt.assert_equal(y_act, y_exp)
 
 
 @pytest.mark.parametrize("backend,X,Y,Z,K",
@@ -109,7 +109,7 @@ def test_compat_CenteredFFT(backend, X,Y,Z, K):
 
 
 @pytest.mark.parametrize("backend,X,Y,Z,RO,PS,K,oversamp,n,width",
-    product( BACKENDS, [23,44], [23,44], [23,44], [33,34], [35,36], [1,2,3], [1.2, 1.375, 1.56, 1.43], [64,128], [3,4] ) )
+    product( BACKENDS, [23,44], [23,44], [23,44], [33,34], [35,36], [1,2], [1.2, 1.375, 1.56, 1.43], [64], [3] ) )
 def test_compat_NUFFT(backend, X, Y, Z, RO, PS, K, oversamp, n, width):
     pymr = pytest.importorskip('pymr')
     b = backend()
@@ -132,12 +132,12 @@ def test_compat_NUFFT(backend, X, Y, Z, RO, PS, K, oversamp, n, width):
     y_act = G1 * x_slo
 
     y_act = y_act.reshape(-1, order='F')
-    npt.assert_allclose( y_act, y_exp, rtol=1e-1)
+    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
 
 
-@pytest.mark.parametrize("backend,X,Y,Z,RO,PS,K,n,width,oversamp",
-    product( BACKENDS, [23,44], [23,44], [23,44], [33,34], [35,36], [1,2,3], [64,128], [3,4], [1.375, 1.43] ) )
-def test_compat_Interp(backend, X, Y, Z, RO, PS, K, n, width, oversamp):
+@pytest.mark.parametrize("backend,X,Y,Z,RO,PS,K,n,width",
+    product( BACKENDS, [23,44], [23,44], [23,44], [33,34], [35,36], [1,2], [64], [3] ) )
+def test_compat_Interp(backend, X, Y, Z, RO, PS, K, n, width):
     pymr = pytest.importorskip('pymr')
     b = backend()
 
@@ -162,9 +162,9 @@ def test_compat_Interp(backend, X, Y, Z, RO, PS, K, n, width, oversamp):
     npt.assert_allclose( y_act, y_exp, rtol=1e-2)
 
 
-@pytest.mark.parametrize("backend,forward,X",
-    product( BACKENDS, [True,False], [1,2] ))
-def test_compat_SENSE(backend, forward, X):
+@pytest.mark.parametrize("backend,forward,os",
+    product( BACKENDS, [True,False], [1.375,1.43] ))
+def test_compat_SENSE(backend, forward, os):
     pymr = pytest.importorskip('pymr')
     b = backend()
 

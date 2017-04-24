@@ -245,8 +245,9 @@ class Backend(object):
 
     def Diag(self, v, **kwargs):
         """ A := diag(v) """
+        v = np.require(v, requirements='F')
         if v.ndim > 1:
-            v = v.flatten(order='F')
+            v = v.flatten(order='A')
         dtype = kwargs.get('dtype', np.dtype('complex64'))
         M = spp.diags( v, offsets=0 ).astype(dtype)
         return self.SpMatrix(M, **kwargs)
@@ -282,7 +283,7 @@ class Backend(object):
     def FFT(self, shape, dtype, **kwargs):
         """ Unitary FFT """
         n = np.prod(shape)
-        s = np.ones(n, dtype=dtype) / np.sqrt(n)
+        s = np.ones(n, order='F', dtype=dtype) / np.sqrt(n)
         S = self.Diag(s, name='scale')
         F = self.UnscaledFFT(shape, dtype, **kwargs)
         return S, F
@@ -295,17 +296,16 @@ class Backend(object):
         for i in range(len(ft_shape)):
             c = ft_shape[i] // 2
             mod += (idx[i] - c / 2.0) * (c / ft_shape[i])
-        mod = np.asfortranarray(mod)
         mod = np.exp(1j * 2.0 * np.pi * mod).astype(dtype)
-        mod = mod.reshape(-1, order='F')
         M = self.Diag(mod, name='mod')
         S, F = self.FFT(ft_shape, dtype=dtype, **kwargs)
         return M, S, F, M
 
     def Zpad(self, M, N, dtype=np.dtype('complex64'), **kwargs):
-        lhs = [ (m-n)//2 for m,n in zip(M,N) ]
-        rhs = [ m-n-l for m,n,l in zip(M,N,lhs) ]
-        slc = [slice(l,-r or None) for l,r in zip(lhs,rhs)]
+        slc = []
+        for m, n in zip(M, N):
+            slc += [slice(m // 2 + int(np.ceil(-n / 2)),
+                          m // 2 + int(np.ceil( n / 2))), ]
         x = np.arange( np.prod(M), dtype=int ).reshape(M, order='F')
         rows = x[slc].flatten(order='F')
         cols = np.arange(rows.size)
