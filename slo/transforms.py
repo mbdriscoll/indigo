@@ -6,7 +6,6 @@ import scipy.sparse as spp
 from itertools import repeat, combinations
 from collections import defaultdict
 
-from slo import oracle
 from slo.operators import (
     CompositeOperator, Product,
     KronI, BlockDiag,
@@ -68,24 +67,14 @@ class Optimize(Transform):
             #CoalesceAdjoints,
         ]
 
-        o = oracle.YesOracle()
         for Step in steps:
             log.info("running optimization step: %s" % Step.__name__)
-            node = Step(o).visit(node)
+            node = Step().visit(node)
 
-        log.info("oracle answered %d questions." % o.num_questions)
         return node
 
 
-class Guided(object):
-    def __init__(self, oracle):
-        self._oracle = oracle
-
-    def ask(self, question):
-        return self._oracle.ask(question)
-
-
-class Normalize(Guided,Transform):
+class Normalize(Transform):
     def visit_Product(self, node):
         """
         Convert nested binary products into a single n-ary product.
@@ -101,7 +90,7 @@ class Normalize(Guided,Transform):
         return node
 
 
-class TreeTransformations(Guided,Transform):
+class TreeTransformations(Transform):
     """
     Manipulates CompositeOperators.
     """
@@ -196,7 +185,7 @@ class TreeTransformations(Guided,Transform):
             return operator([L*R for L,R in zip(lc,rc)], name=left._name)
 
 
-class RealizeMatrices(Guided,Transform):
+class RealizeMatrices(Transform):
     """
     Converts CompositeOps into SpMatrix ops if all
     children of the CompositeOp are SpMatrices.
