@@ -202,7 +202,7 @@ def test_compat_SENSE(backend, forward, os):
         act = A_slo.H * ksp.reshape( (-1,1), order='F' )
 
     act = act.flatten(order='F')
-    npt.assert_allclose(act, exp, rtol=1e-2)
+    npt.assert_allclose(abs(act), abs(exp), rtol=1e-2)
 
 @pytest.mark.parametrize("backend,N",
     product( BACKENDS, [120,130,140] ))
