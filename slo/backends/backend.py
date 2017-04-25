@@ -518,9 +518,6 @@ class Backend(object):
         x0 : 1D array, initial solution
         maxiter : int, optional
         '''
-
-        self.profiler_start()
-
         x = self.copy_array(x_h)
         z = x.copy()
         o = x.copy()
@@ -546,5 +543,3 @@ class Backend(object):
             log.info("iter %d, residual %g", it, r2.real)
 
         x.copy_to(x_h)
-
-        self.profiler_stop()

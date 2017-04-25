@@ -211,7 +211,7 @@ def test_compat_conjgrad(backend, N):
     b = backend()
 
     A = slo.util.randM( N, N, 0.5 )
-    A = A.H @ A
+    A = A.H @ A # make positive definite
     y = slo.util.rand64c( N )
     x0 = np.zeros( N, dtype=np.complex64 )
 
@@ -237,3 +237,46 @@ def test_compat_rolloff(oversamp, width, beta, X, Y, Z):
     r_exp = pymr_rolloff3(oversamp, width, beta, N)
     r_act =  slo_rolloff3(oversamp, width, beta, N)
     npt.assert_allclose(r_exp, r_act)
+
+
+@pytest.mark.parametrize("backend,M,N,alpha",
+    product( BACKENDS, [120,130,140], [111,222,333], [1e-2, 1e-3] ))
+def test_compat_apgd(backend, M, N, alpha):
+    pymr = pytest.importorskip('pymr')
+    b = backend()
+
+    A = slo.util.randM( M, N, 0.5 )
+    AHA = A.H @ A # make positive definite
+    y = slo.util.rand64c( M )
+    AHy = A.H * y
+    x0 = np.zeros( N, dtype=np.complex64 )
+
+    A_pmr = pymr.linop.Matrix( AHA.toarray(), dtype=A.dtype )
+
+    # check pymr
+    def gradf_pmr(x):
+        return A_pmr * x - AHy
+
+    def proxg_pmr(alpha, x0, x1):
+        pass
+
+    x_exp = pymr.alg.gd(gradf_pmr, alpha, x0, proxg=proxg_pmr, maxiter=40)
+
+    # check slo
+    x0[:] = 0
+    A_slo = b.SpMatrix(AHA)
+    AHy_d = b.copy_array(AHy)
+
+    def gradf_slo(gf, x):
+        # gf = AHA*x - AHy
+        A_slo.eval(gf, x)
+        b.axpy(gf, -1, AHy_d)
+
+    def proxg_slo(alpha, x):
+        # x = thresh(x)
+        pass
+
+    b.apgd(gradf_slo, proxg_slo, alpha, x0, maxiter=40)
+    x_act = x0.copy()
+
+    npt.assert_allclose(x_act, x_exp)
