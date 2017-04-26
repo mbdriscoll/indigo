@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as spp
 
-def rand64c(*shape):
+def rand64c(*shape, order='F'):
     """
     Constructs a `np.ndarray` of the requested shape and
     populates it with random np.complex64 values.
@@ -9,7 +9,8 @@ def rand64c(*shape):
     r = np.random.rand(*shape).astype(np.float32)
     i = np.random.rand(*shape).astype(np.float32)
     arr = (r + 1j*i).astype(np.complex64)
-    arr = np.asfortranarray(arr)
+    if order == 'F':
+        arr = np.asfortranarray(arr)
     return arr
 
 

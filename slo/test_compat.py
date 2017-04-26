@@ -109,7 +109,7 @@ def test_compat_CenteredFFT(backend, X,Y,Z, K):
 
 
 @pytest.mark.parametrize("backend,X,Y,Z,RO,PS,K,oversamp,n,width",
-    product( BACKENDS, [23,44], [23,44], [23,44], [33,34], [35,36], [1,2], [1.2, 1.375, 1.56, 1.43], [64], [3] ) )
+    product( BACKENDS, [23,44], [23,44], [23,44], [33,34], [35,36], [1,2], [1.375, 1.43], [64], [3] ) )
 def test_compat_NUFFT(backend, X, Y, Z, RO, PS, K, oversamp, n, width):
     pymr = pytest.importorskip('pymr')
     b = backend()
