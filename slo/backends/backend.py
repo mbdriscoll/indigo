@@ -364,14 +364,12 @@ class Backend(object):
 
     def pdot(self, x, y, comm):
         xHy = self.dot(x, y)
-        #with profile("MPI_Allreduce"):
         if comm is not None:
             xHy = comm.allreduce( xHy )
         return xHy
 
     def pnorm2(self, x, comm):
         xTx = self.norm2(x)
-        #with profile("MPI_Allreduce"):
         if comm is not None:
             xTx = comm.allreduce( xTx )
         return xTx
