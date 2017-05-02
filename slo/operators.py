@@ -369,6 +369,9 @@ class Allreduce(Operator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         assert alpha == 1 and beta == 0
+
+        from mpi4py import MPI
+
         if forward:
             y.copy(x)
         else:
