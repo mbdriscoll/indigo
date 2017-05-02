@@ -204,20 +204,6 @@ class CudaBackend(Backend):
     cudaMemcpy.DeviceToDevice =   3
     cudaMemcpy.Default        =   4
 
-    @wrap(cudart)
-    def cudaProfilerStart() -> cudaError_t:
-        pass
-
-    @wrap(cudart)
-    def cudaProfilerStop() -> cudaError_t:
-        pass
-
-    def profiler_start(self):
-        self.cudaProfilerStart()
-
-    def profiler_stop(self):
-        self.cudaProfilerStop()
-
     # -----------------------------------------------------------------------
     # Arrays
     # -----------------------------------------------------------------------

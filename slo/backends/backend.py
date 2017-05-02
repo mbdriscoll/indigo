@@ -4,6 +4,7 @@ import numpy as np
 import scipy.sparse as spp
 
 import slo.operators as op
+from slo.util import profile
 
 log = logging.getLogger(__name__)
 
@@ -187,12 +188,6 @@ class Backend(object):
         x = np.require(x, dtype=np.dtype('complex64'), requirements='F')
         x_d = self.copy_array(x, name=name)
         return x_d
-
-    def profiler_start(self):
-        pass
-
-    def profiler_stop(self):
-        pass
 
     def mem_usage(self):
         nbytes = 0
@@ -440,8 +435,8 @@ class Backend(object):
     # -----------------------------------------------------------------------
 
     def cg(self, A, b_h, x_h, lamda=0.0, tol=1e-10, maxiter=100, team=None):
-        '''Conjugate gradient.
-        Solves for A x = b, where A is positive semi-definite
+        """
+        Conjugate gradient. Solves for A x = b, where A is positive semi-definite.
 
         Parameters
         ----------
@@ -450,10 +445,7 @@ class Backend(object):
         x : 1D array, initial solution
         maxiter : int, optional
         {IterPrint, IterPlot, IterWrite, IterCompare}
-        '''
-
-        self.profiler_start()
-
+        """
         Ap = self.zero_array( (A.shape[0],), x_h.dtype, name='Ap' )
         x = self.copy_array( x_h, name='x' )
         b = self.copy_array( b_h, name='b' )
@@ -469,10 +461,9 @@ class Backend(object):
         rr = self.pnorm2(r, team)
         r0 = rr
 
-        times = []
-
         for it in range(maxiter):
-            t = time.time()
+            profile.extra['it'] = it
+
             A.eval(Ap, p)
             self.axpy(Ap, lamda, p)
             alpha = rr / self.pdot(p, Ap, team)
@@ -488,21 +479,12 @@ class Backend(object):
             resid = np.sqrt(rr / r0)
             log.info("iter %d, residual %g", it, resid.real)
 
-            if it > 1:
-                times.append( time.time() - t )
-
             if resid < tol:
                 log.info("cg reached tolerance")
                 break
         else:
             log.info("cg reached maxiter")
-
         x.copy_to(x_h)
-
-        self.profiler_stop()
-        log.info("median iteration time: %4.3f s, memory: %.0f MB" % (np.median(times), self.mem_usage()/1e6))
-
-        return x_h
 
     def apgd(self, gradf, proxg, alpha, x_h, maxiter=100, team=None):
         '''Accelerated proximal gradient descent.
@@ -523,6 +505,8 @@ class Backend(object):
 
         t = 1.0
         for it in range(maxiter):
+            profile.extra['it'] = it
+
             o.copy(x)
             s = t
 
@@ -539,5 +523,4 @@ class Backend(object):
 
             r2 = self.pnorm2(x, team)
             log.info("iter %d, residual %g", it, r2.real)
-
         x.copy_to(x_h)

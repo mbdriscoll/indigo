@@ -164,10 +164,11 @@ class SpMatrix(Operator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         M_d = self._get_or_create_device_matrix()
-        if forward:
-            M_d.forward(y, x, alpha=alpha, beta=beta, stream=self.stream)
-        else:
-            M_d.adjoint(y, x, alpha=alpha, beta=beta, stream=self.stream)
+        with profile("spmv"):
+            if forward:
+                M_d.forward(y, x, alpha=alpha, beta=beta, stream=self.stream)
+            else:
+                M_d.adjoint(y, x, alpha=alpha, beta=beta, stream=self.stream)
 
 
 class UnscaledFFT(Operator):
@@ -195,10 +196,11 @@ class UnscaledFFT(Operator):
             vslc = slice( b*batch, (b+1)*batch )
             X = x[:,vslc].reshape( batch_shape )
             Y = y[:,vslc].reshape( batch_shape )
-            if forward:
-                self._backend.fftn(Y, X, self.stream)
-            else:
-                self._backend.ifftn(Y, X, self.stream)
+            with profile("fft"):
+                if forward:
+                    self._backend.fftn(Y, X, self.stream)
+                else:
+                    self._backend.ifftn(Y, X, self.stream)
 
     def _mem_usage(self):
         return 0
@@ -376,8 +378,11 @@ class Allreduce(Operator):
             y.copy(x)
         else:
             if self._team.size > 1:
-                x_h = x.to_host()
-                self._team.Allreduce( MPI.IN_PLACE, x_h )
-                y.copy_from(x_h)
+                with profile("copyout"):
+                    x_h = x.to_host()
+                with profile("allreduce"):
+                    self._team.Allreduce( MPI.IN_PLACE, x_h )
+                with profile("copyin"):
+                    y.copy_from(x_h)
             else:
                 y.copy(x)
