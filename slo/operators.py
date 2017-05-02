@@ -382,6 +382,8 @@ class Allreduce(Operator):
             if self._team.size > 1:
                 with profile("copyout"):
                     x_h = x.to_host()
+                with profile("sense/imbalance"):
+                    self._team.Barrier()
                 with profile("allreduce"):
                     self._team.Allreduce( MPI.IN_PLACE, x_h )
                 with profile("copyin"):
