@@ -48,5 +48,5 @@ class profile(object):
         data.update(self._kwargs)
         kvs = sorted(data.items(), key=lambda kv: kv[0])
         msg = "PROFILE(%s)" % ", ".join("%s=%s" % (k,repr(v)) for k,v in kvs)
-        log.critical(msg)
+        log.debug(msg)
 
