@@ -5,6 +5,8 @@ import itertools
 import numpy as np
 import scipy.sparse as spp
 
+from slo.util import profile
+
 log = logging.getLogger(__name__)
 
 class Operator(object):
