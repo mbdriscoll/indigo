@@ -191,18 +191,13 @@ class UnscaledFFT(Operator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         assert alpha == 1 and beta == 0
-        batch = self._default_batch or x.shape[1]
-        assert x.shape[1] % batch == 0
-        for b in range( x.shape[1] // batch ):
-            batch_shape = self._ft_shape + (batch,)
-            vslc = slice( b*batch, (b+1)*batch )
-            X = x[:,vslc].reshape( batch_shape )
-            Y = y[:,vslc].reshape( batch_shape )
-            with profile("fft"):
-                if forward:
-                    self._backend.fftn(Y, X, self.stream)
-                else:
-                    self._backend.ifftn(Y, X, self.stream)
+        X = x.reshape( self._ft_shape + (x.shape[1],) )
+        Y = y.reshape( self._ft_shape + (x.shape[1],) )
+        with profile("fft"):
+            if forward:
+                self._backend.fftn(Y, X, self.stream)
+            else:
+                self._backend.ifftn(Y, X, self.stream)
 
     def _mem_usage(self):
         return 0
