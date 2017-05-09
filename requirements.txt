@@ -1,4 +1,4 @@
-name: picsdm
+name: slo
 channels:
 - defaults
 - conda-forge
@@ -22,4 +22,3 @@ dependencies:
 - wheel=0.29.0=py35_0
 - xz=5.2.2=1
 - zlib=1.2.8=3
-prefix: /global/homes/d/driscoll/.conda/envs/picsdm
