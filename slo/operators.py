@@ -166,7 +166,10 @@ class SpMatrix(Operator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         M_d = self._get_or_create_device_matrix()
-        with profile("spmv"):
+        nbytes = M_d.nbytes + \
+            min( M_d.nnz * x.itemsize, x.nbytes ) + \
+            min( M_d.nnz * y.itemsize, y.nbytes ) * (2 if beta != 0 else 1)
+        with profile("spmv", nbytes=nbytes):
             if forward:
                 M_d.forward(y, x, alpha=alpha, beta=beta, stream=self.stream)
             else:
@@ -193,7 +196,12 @@ class UnscaledFFT(Operator):
         assert alpha == 1 and beta == 0
         X = x.reshape( self._ft_shape + (x.shape[1],) )
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
-        with profile("fft"):
+
+        u,v,w,batch = X.shape
+        flops = batch * 5 * u*v*w * np.log2(u*v*w)
+        nbytes = X.nbytes + Y.nbytes
+
+        with profile("fft", flops=flops, nbytes=nbytes):
             if forward:
                 self._backend.fftn(Y, X, self.stream)
             else:

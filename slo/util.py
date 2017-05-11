@@ -2,6 +2,7 @@ import time
 import logging
 import numpy as np
 import scipy.sparse as spp
+from ctypes import cdll, c_int
 
 log = logging.getLogger(__name__)
 
@@ -43,10 +44,26 @@ class profile(object):
         data = dict(
             duration = time.time() - self._start,
             event    = self._event,
+            threads  = omp_get_max_threads(),
         )
         data.update(self.extra)
         data.update(self._kwargs)
+
+        if 'flops' in self._kwargs:
+            data['gflop_rate'] = data['flops'] / data['duration'] * 1e-9
+
+        if 'nbytes' in self._kwargs:
+            data['membw_rate'] = data['nbytes'] / data['duration'] * 1e-9
+
         kvs = sorted(data.items(), key=lambda kv: kv[0])
         msg = "PROFILE(%s)" % ", ".join("%s=%s" % (k,repr(v)) for k,v in kvs)
         log.debug(msg)
 
+try:
+    libgomp = cdll.LoadLibrary("libgomp.so")
+    omp_get_max_threads = libgomp['omp_get_max_threads']
+    omp_get_max_threads.rettype = c_int
+except OSError:
+    log.warn("cannot find libgomp. omp_get_max_threads will be unrealiable")
+    def omp_get_max_threads():
+        return 1

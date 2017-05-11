@@ -122,6 +122,7 @@ def test_compat_NUFFT(backend, X, Y, Z, RO, PS, K, oversamp, n, width):
     traj = slo.util.rand64c( *t_dims ).real - 0.5
     kwargs = dict(oversamp=oversamp, width=width, n=n, dtype=x.dtype)
 
+    print(nc_dims, c_dims, traj.shape)
     G0 = pymr.linop.NUFFT(nc_dims, c_dims, traj, **kwargs)
 
     G_t, Mk, S, F, Mx, Z, R = b.NUFFT(nc_dims[:3], c_dims[:3], traj, **kwargs)

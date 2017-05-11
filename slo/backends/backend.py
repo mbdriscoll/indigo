@@ -66,6 +66,10 @@ class Backend(object):
             return np.prod(self.shape)
 
         @property
+        def itemsize(self):
+            return self.dtype.itemsize
+
+        @property
         def nbytes(self):
             return self.size * np.dtype(self.dtype).itemsize
 
@@ -430,6 +434,10 @@ class Backend(object):
         def nbytes(self):
             return self.rowPtrs.nbytes + self.colInds.nbytes + self.values.nbytes
 
+        @property
+        def nnz(self):
+            return self.values.size
+
     # -----------------------------------------------------------------------
     # Algorithms
     # -----------------------------------------------------------------------
@@ -463,25 +471,25 @@ class Backend(object):
 
         for it in range(maxiter):
             profile.extra['it'] = it
+            with profile("iter"):
+                A.eval(Ap, p)
+                self.axpy(Ap, lamda, p)
+                alpha = rr / self.pdot(p, Ap, team)
+                self.axpy(x, alpha, p)
+                self.axpy(r, -alpha, Ap)
 
-            A.eval(Ap, p)
-            self.axpy(Ap, lamda, p)
-            alpha = rr / self.pdot(p, Ap, team)
-            self.axpy(x, alpha, p)
-            self.axpy(r, -alpha, Ap)
+                r2 = self.pnorm2(r, team)
+                beta = r2 / rr
+                self.scale(p, beta)
+                self.axpy(p, 1, r)
+                rr = r2
 
-            r2 = self.pnorm2(r, team)
-            beta = r2 / rr
-            self.scale(p, beta)
-            self.axpy(p, 1, r)
-            rr = r2
+                resid = np.sqrt(rr / r0)
+                log.info("iter %d, residual %g", it, resid.real)
 
-            resid = np.sqrt(rr / r0)
-            log.info("iter %d, residual %g", it, resid.real)
-
-            if resid < tol:
-                log.info("cg reached tolerance")
-                break
+                if resid < tol:
+                    log.info("cg reached tolerance")
+                    break
         else:
             log.info("cg reached maxiter")
         x.copy_to(x_h)
@@ -506,21 +514,22 @@ class Backend(object):
         t = 1.0
         for it in range(maxiter):
             profile.extra['it'] = it
+            with profile("iter"):
 
-            o.copy(x)
-            s = t
+                o.copy(x)
+                s = t
 
-            gradf(gf, z)
-            self.axpy(x, -alpha, gf)
-            proxg(alpha, x)
+                gradf(gf, z)
+                self.axpy(x, -alpha, gf)
+                proxg(alpha, x)
 
-            t = (1.0 + (1.0 + 4.0 * t**2)**0.5) / 2.0
+                t = (1.0 + (1.0 + 4.0 * t**2)**0.5) / 2.0
 
-            # z = x + (s-1)/t * (x-o)
-            z.copy(x)                # z = x
-            self.axpy(z, (s-1)/t, x) # z += (s-1)/t*x
-            self.axpy(z, (1-s)/t, o) # z += (1-s)/t*o
+                # z = x + (s-1)/t * (x-o)
+                z.copy(x)                # z = x
+                self.axpy(z, (s-1)/t, x) # z += (s-1)/t*x
+                self.axpy(z, (1-s)/t, o) # z += (1-s)/t*o
 
-            r2 = self.pnorm2(x, team)
-            log.info("iter %d, residual %g", it, r2.real)
+                r2 = self.pnorm2(x, team)
+                log.info("iter %d, residual %g", it, r2.real)
         x.copy_to(x_h)
