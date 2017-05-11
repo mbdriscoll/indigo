@@ -56,11 +56,23 @@ class MklBackend(Backend):
             return self._backend.dndarray( self._backend, d.shape, d.dtype,
                 ld=ld, own=False, data=d )
 
+        def to_host(self):
+            return self._arr
+
+        def copy_from(self, other):
+            if self._arr is other:
+                return
+            else:
+                return super(MklBackend.dndarray, self).copy_from(other)
+
         @staticmethod
         def from_param(obj):
             if not isinstance(obj, MklBackend.dndarray):
                 raise ArgumentError('{} is not a dndarray'.format( type(obj) ))
             return obj._arr.ctypes.get_as_parameter()
+
+        def as_nparray(self):
+            return self._arr
 
     # -----------------------------------------------------------------------
     # BLAS Routines

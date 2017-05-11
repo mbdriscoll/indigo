@@ -204,21 +204,21 @@ def test_SpMatrix_alpha_beta(backend, M, N, K, density, alpha, beta):
     A = b.SpMatrix(A_h)
 
     # forward
-    x = b.rand_array((N,K)); x_h = x.to_host()
-    y = b.rand_array((M,K)); y_h = y.to_host()
+    x = b.rand_array((N,K)); x_h = x.to_host().copy()
+    y = b.rand_array((M,K)); y_h = y.to_host().copy()
     A.eval(y, x, alpha=alpha, beta=beta)
 
     y_exp = alpha*A_h*x_h + beta*y_h
-    y_act = y.to_host()
+    y_act = y.to_host().copy()
     npt.assert_allclose(y_act, y_exp, rtol=1e-5)
 
     # adjoint
-    x = b.rand_array((M,K)); x_h = x.to_host()
-    y = b.rand_array((N,K)); y_h = y.to_host()
+    x = b.rand_array((M,K)); x_h = x.to_host().copy()
+    y = b.rand_array((N,K)); y_h = y.to_host().copy()
     A.H.eval(y, x, alpha=alpha, beta=beta)
 
     y_exp = alpha*A_h.H*x_h + beta*y_h
-    y_act = y.to_host()
+    y_act = y.to_host().copy()
     npt.assert_allclose(y_act, y_exp, rtol=1e-5)
 
 
