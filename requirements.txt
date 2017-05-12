@@ -3,7 +3,6 @@ channels:
 - defaults
 - conda-forge
 dependencies:
-- joblib=0.11=py35_0
 - libgfortran=3.0.0=1
 - llvmlite=0.17.0=py35_0
 - mkl=2017.0.1=0

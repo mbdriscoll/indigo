@@ -2,7 +2,6 @@ import numba as nb
 import math
 import numpy as np
 import scipy.sparse as sparse
-from joblib import Parallel, delayed
 __all__ = ['interp_mat', 'interp_funs']
 
 
@@ -75,18 +74,7 @@ def interp_mat(m, N, width, table, coord, backend):
         raise ValueError('Number of dimensions can only be 1, 2 or 3, got %r',
                          ndim)
 
-    # Get num_threads
-    num_threads = 1
-    
-    chunk = (m + num_threads - 1) // num_threads
-    out = Parallel(n_jobs=num_threads)([delayed(_interp_mat)(min(chunk, m - i * chunk),
-                                                             N, width, table,
-                                                             coord[:, i * chunk:])
-                                        for i in range(num_threads)])
-    
-    row = np.concatenate([out[i][0] + i * chunk for i in range(num_threads)])
-    col = np.concatenate([out[i][1] for i in range(num_threads)])
-    ker = np.concatenate([out[i][2] for i in range(num_threads)])
+    row, col, ker = _interp_mat(m, N, width, table, coord)
     
     return sparse.coo_matrix((ker, (row, col)),
                              shape=(m, np.prod(N, dtype=np.int)))
