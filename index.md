@@ -77,11 +77,15 @@ Currently unimplemented. Consider using `VStack` and `Adjoint`:
 ```
 HStack(A,B) = Adjoint( VStack( Adjoint(A), Adjoint(B) ) )
 ```
+
 #### Product Matrix (`slo.operators.Product`)
-TODO
+
+![Product Matrix](imgs/Product.png)
+
 
 #### Adjoint Matrix (`slo.operators.Adjoint`)
-TODO
+
+![Adjoint Matrix](imgs/Adjoint.png)
 
 
 ### Derived Operators
