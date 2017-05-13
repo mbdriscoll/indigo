@@ -111,5 +111,4 @@ A centered DFT consists of an FFT Shift, followed by a standard FFT, followed by
 SLO implements an NUFFT as a product of diagonal, FFT, and general sparse matrices (for apodization, FFT, and interpolation, respectively).
 
 ## FAQ
-1. What datatypes are supported?
-..* `slo` only support `complex float`s at the moment, although it's not a fundamental limitation.
+1. *What datatypes are supported?* `slo` only support `complex float`s at the moment, although it's not a fundamental limitation.
