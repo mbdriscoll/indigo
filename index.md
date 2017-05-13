@@ -15,6 +15,7 @@ conda env create --file requirements.txt
 ```
 pytest
 ```
+
 ## Examples
 See [spmm.py](https://github.com/mbdriscoll/slo/blob/master/examples/spmm.py) in the `examples` directory.
 
@@ -50,7 +51,7 @@ Supports 3D FFTs. 1D and 2D TBD.
 
 ### Composite Operators
 
-Composite operators represent a collection of other operators arranged in some structured way.
+Composite operators represent a collection of operators arranged in some structured way.
 
 
 #### BlockDiag Matrix (`slo.operators.BlockDiag`)
@@ -111,4 +112,4 @@ A centered DFT consists of an FFT Shift, followed by a standard FFT, followed by
 SLO implements an NUFFT as a product of diagonal, FFT, and general sparse matrices (for apodization, FFT, and interpolation, respectively).
 
 ## FAQ
-1. *What datatypes are supported?* `slo` only support `complex float`s at the moment, although it's not a fundamental limitation.
+1. *What datatypes are supported?* `slo` only support single-precision complex floating point numbers at the moment, but it's not a fundamental limitation.
