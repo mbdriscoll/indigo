@@ -198,10 +198,10 @@ class UnscaledFFT(Operator):
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
 
         u,v,w,batch = X.shape
-        flops = batch * 5 * u*v*w * np.log2(u*v*w)
+        nflops = batch * 5 * u*v*w * np.log2(u*v*w)
         nbytes = X.nbytes + Y.nbytes
 
-        with profile("fft", flops=flops, nbytes=nbytes):
+        with profile("fft", nflops=nflops, nbytes=nbytes):
             if forward:
                 self._backend.fftn(Y, X, self.stream)
             else:
@@ -357,39 +357,3 @@ class Product(CompositeOperator):
 
     def _mem_usage(self):
         return getattr(self._intermediate, 'nbytes', 0)
-
-
-class Allreduce(Operator):
-    def __init__(self, backend, n, team, dtype=np.dtype('complex64'), forward=True, **kwargs):
-        super().__init__(backend, **kwargs)
-        self._dtype = dtype
-        self._team = team
-        self._n = n
-
-    @property
-    def shape(self):
-        return (self._n, self._n)
-
-    @property
-    def dtype(self):
-        return self._dtype
-
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
-        assert alpha == 1 and beta == 0
-
-        from mpi4py import MPI
-
-        if forward:
-            y.copy(x)
-        else:
-            if self._team.size > 1:
-                with profile("copyout"):
-                    x_h = x.to_host()
-                with profile("sense/imbalance"):
-                    self._team.Barrier()
-                with profile("allreduce"):
-                    self._team.Allreduce( MPI.IN_PLACE, x_h )
-                with profile("copyin"):
-                    y.copy_from(x_h)
-            else:
-                y.copy(x)

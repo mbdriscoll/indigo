@@ -49,8 +49,8 @@ class profile(object):
         data.update(self.extra)
         data.update(self._kwargs)
 
-        if 'flops' in self._kwargs:
-            data['gflop_rate'] = data['flops'] / data['duration'] * 1e-9
+        if 'nflops' in self._kwargs:
+            data['gflop_rate'] = data['nflops'] / data['duration'] * 1e-9
 
         if 'nbytes' in self._kwargs:
             data['membw_rate'] = data['nbytes'] / data['duration'] * 1e-9
