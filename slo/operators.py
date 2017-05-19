@@ -176,6 +176,43 @@ class SpMatrix(Operator):
                 M_d.adjoint(y, x, alpha=alpha, beta=beta, stream=self.stream)
 
 
+class DenseMatrix(Operator):
+    def __init__(self, backend, M, **kwargs):
+        """
+        Create a new Sparse Matrix Operator from a concrete sparse matrix.
+        """
+        super().__init__(backend, **kwargs)
+        assert isinstance(M, np.ndarray)
+        assert M.dtype == np.dtype('complex64')
+        assert M.flags['F_CONTIGUOUS']
+        assert M.ndim == 2
+        self._matrix = M
+        self._matrix_d = None
+
+    @property
+    def dtype(self):
+        return self._matrix.dtype
+
+    @property
+    def shape(self):
+        return self._matrix.shape
+
+    def _get_or_create_device_matrix(self):
+        if self._matrix_d is None:
+            self._matrix_d = self._backend.copy_array( self._matrix )
+        return self._matrix_d
+
+    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+        M_d = self._get_or_create_device_matrix()
+        nbytes = M_d.nbytes + \
+            min( M_d.nnz * x.itemsize, x.nbytes ) + \
+            min( M_d.nnz * y.itemsize, y.nbytes ) * (2 if beta != 0 else 1)
+        (m, n), k = M_d.shape, x.shape[1]
+        nflops = m * n * k * 5
+        with profile("cgemm", nflops=nflops, nbytes=nbytes):
+            self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward)
+
+
 class UnscaledFFT(Operator):
     def __init__(self, backend, ft_shape, dtype=np.dtype('complex64'), forward=True, **kwargs):
         super().__init__(backend, **kwargs)

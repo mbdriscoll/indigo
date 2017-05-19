@@ -69,6 +69,14 @@ class NumpyBackend(Backend):
         assert isinstance(x, self.dndarray)
         x._arr *= alpha
 
+    def cgemm(self, y, M, x, alpha, beta, forward):
+        x, y, M = x._arr, y._arr, M._arr
+        if forward:
+            y[:] = alpha * (M @ x) + beta * y
+        else:
+            MH = np.conj(M.T)
+            y[:] = alpha * (MH @ x) + beta * y
+
     # -----------------------------------------------------------------------
     # FFT Routines
     # -----------------------------------------------------------------------

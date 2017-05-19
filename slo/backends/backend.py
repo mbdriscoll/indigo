@@ -373,6 +373,12 @@ class Backend(object):
             xTx = comm.allreduce( xTx )
         return xTx
 
+    def cgemm(self, y, M, x, alpha, beta, forward):
+        """
+        Peform a dense matrix-matrix multiplication.
+        """
+        raise NotImplementedError()
+
     # -----------------------------------------------------------------------
     # FFT Routines
     # -----------------------------------------------------------------------

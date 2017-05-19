@@ -7,7 +7,8 @@ from numpy.ctypeslib import ndpointer
 
 from .backend import Backend
 
-libmkl_rt = cdll.LoadLibrary("libmkl_rt.so")
+#libmkl_rt = cdll.LoadLibrary("libmkl_rt.so")
+libmkl_rt = cdll.LoadLibrary("/Users/driscoll/.conda3/envs/picsdm/lib/libmkl_rt.dylib")
 
 class MklBackend(Backend):
 
@@ -97,6 +98,51 @@ class MklBackend(Backend):
         assert isinstance(x, self.dndarray)
         a = np.array(alpha, dtype=np.complex64)
         self.cblas_cscal( x.size, a, x._arr, 1 )
+
+    def cgemm(self, y, M, x, alpha, beta, forward):
+        layout = MklBackend.CBlasLayout.ColMajor
+        if forward:
+            transa = MklBackend.CBlasTranspose.NoTrans
+        else:
+            transa = MklBackend.CBlasTranspose.ConjTrans
+        transb = MklBackend.CBlasTranspose.NoTrans
+        (m, n), k = y.shape, x.shape[0]
+        alpha, beta = np.array(alpha), np.array(beta)
+        lda = M.shape[0]
+        ldb = x.shape[0]
+        ldc = y.shape[0]
+        self.cblas_cgemm(
+            layout, transa, transb, m, n, k,
+            alpha, M, lda, x, ldb, beta, y, ldc
+        )
+
+    class CBlasLayout(c_size_t):
+        RowMajor = 101
+        ColMajor = 103
+
+    class CBlasTranspose(c_size_t):
+        NoTrans   = 111
+        Trans     = 112
+        ConjTrans = 113
+
+    @wrap
+    def cblas_cgemm(
+        layout : CBlasLayout,
+        transa : CBlasTranspose,
+        transb : CBlasTranspose,
+        m     : c_int,
+        n     : c_int,
+        k     : c_int,
+        alpha : ndpointer(dtype=np.float32, ndim=0),
+        a     : ndpointer(dtype=np.complex64),
+        lda   : c_int,
+        b     : ndpointer(dtype=np.complex64),
+        ldb   : c_int,
+        beta  : ndpointer(dtype=np.float32, ndim=0),
+        c     : ndpointer(dtype=np.complex64),
+        ldc   : c_int,
+    ) -> c_void_p:
+        pass
 
     @wrap
     def cblas_caxpy(
