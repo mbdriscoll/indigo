@@ -264,8 +264,8 @@ def test_blas_axpy(backend, n, alpha, alpha_i):
     product(BACKENDS, [10,23,129,144],
                       [10,23,129,144],
                       [10,23,129,144],
-                      [1, 0, 0.5],
-                      [ 0],
+                      [1,0.5,0.0],
+                      [0,0.5,0.0],
                       [True, False])
 )
 def test_blas_cgemm(backend, m, n, k, alpha, beta, forward):
@@ -277,9 +277,10 @@ def test_blas_cgemm(backend, m, n, k, alpha, beta, forward):
 
     if not forward:
         x, y = y, x
-        y_exp = alpha * np.conj(M.T) @ x + beta * y
+        M_exp = np.conj(M.T)
     else:
-        y_exp = alpha * M @ x + beta * y
+        M_exp = M
+    y_exp = alpha * M_exp.dot(x) + beta * y
 
     y_d = b.copy_array(y)
     M_d = b.copy_array(M)
@@ -287,4 +288,4 @@ def test_blas_cgemm(backend, m, n, k, alpha, beta, forward):
     b.cgemm(y_d, M_d, x_d, alpha, beta, forward=forward)
     y_act = y_d.to_host()
 
-    np.testing.assert_allclose(y_exp, y_act, atol=1e-6)
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-4)

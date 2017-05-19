@@ -107,7 +107,8 @@ class MklBackend(Backend):
             transa = MklBackend.CBlasTranspose.ConjTrans
         transb = MklBackend.CBlasTranspose.NoTrans
         (m, n), k = y.shape, x.shape[0]
-        alpha, beta = np.array(alpha), np.array(beta)
+        alpha = np.array(alpha, dtype=np.complex64)
+        beta  = np.array( beta, dtype=np.complex64)
         lda = M.shape[0]
         ldb = x.shape[0]
         ldc = y.shape[0]
@@ -116,11 +117,11 @@ class MklBackend(Backend):
             alpha, M, lda, x, ldb, beta, y, ldc
         )
 
-    class CBlasLayout(c_size_t):
+    class CBlasLayout(c_uint):
         RowMajor = 101
-        ColMajor = 103
+        ColMajor = 102
 
-    class CBlasTranspose(c_size_t):
+    class CBlasTranspose(c_uint):
         NoTrans   = 111
         Trans     = 112
         ConjTrans = 113
@@ -133,13 +134,13 @@ class MklBackend(Backend):
         m     : c_int,
         n     : c_int,
         k     : c_int,
-        alpha : ndpointer(dtype=np.float32, ndim=0),
-        a     : ndpointer(dtype=np.complex64),
+        alpha : ndpointer(dtype=np.complex64, ndim=0),
+        a     : dndarray,
         lda   : c_int,
-        b     : ndpointer(dtype=np.complex64),
+        b     : dndarray,
         ldb   : c_int,
-        beta  : ndpointer(dtype=np.float32, ndim=0),
-        c     : ndpointer(dtype=np.complex64),
+        beta  : ndpointer(dtype=np.complex64, ndim=0),
+        c     : dndarray,
         ldc   : c_int,
     ) -> c_void_p:
         pass
