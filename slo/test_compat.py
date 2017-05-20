@@ -281,3 +281,21 @@ def test_compat_apgd(backend, M, N, alpha):
     x_act = x0.copy()
 
     npt.assert_allclose(x_act, x_exp)
+
+
+@pytest.mark.parametrize("backend,M,N,K",
+    product( BACKENDS, [12,34], [23,45], [1] ) )
+def test_compat_Matrix(backend, M, N, K):
+    pymr = pytest.importorskip('pymr')
+    b = backend()
+    A = slo.util.rand64c(M,N)
+    x = slo.util.rand64c(N,K); x_d = b.copy_array(x)
+    y = slo.util.rand64c(M,K); y_d = b.copy_array(y)
+
+    A0 = pymr.linop.Matrix( A, dtype=A.dtype )
+    A1 = b.DenseMatrix(A)
+
+    y_exp = pymr.util.reshape(A0 * pymr.util.vec(x), y.shape)
+    y_act = A1 * x
+
+    npt.assert_allclose(y_act, y_exp, rtol=1e-5)

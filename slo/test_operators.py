@@ -405,3 +405,25 @@ def test_nested_kroni(backend, batch, M, N, c1, c2):
     u_act = u_d.to_host()
     u_exp = A_h.H @ v
     np.testing.assert_allclose( u_act, u_exp, rtol=1e-6 )
+
+
+@pytest.mark.parametrize("backend,M,N,K,forward",
+    product( BACKENDS, [23,24,45], [45,24,23], [1,8,9,17], [True,False] ))
+def test_DenseMatrix(backend, M, N, K, forward):
+    b = backend()
+    A_h = slo.util.rand64c(M,N)
+    A = b.DenseMatrix(A_h)
+
+    if forward:
+        x = b.rand_array((N,K))
+        y = b.rand_array((M,K))
+        y_exp = A_h.dot(x.to_host())
+        A.eval(y, x)
+    else:
+        x = b.rand_array((M,K))
+        y = b.rand_array((N,K))
+        y_exp = np.conj(A_h.T).dot(x.to_host())
+        A.H.eval(y, x)
+
+    y_act = y.to_host()
+    npt.assert_allclose(y_act, y_exp, rtol=1e-5)

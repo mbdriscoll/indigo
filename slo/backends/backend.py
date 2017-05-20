@@ -237,6 +237,12 @@ class Backend(object):
         assert isinstance(M, spp.spmatrix)
         return op.SpMatrix(self, M, **kwargs)
 
+    def DenseMatrix(self, M, **kwargs):
+        """ A := M """
+        assert isinstance(M, np.ndarray)
+        assert M.ndim == 2
+        return op.DenseMatrix(self, M, **kwargs)
+
     def Diag(self, v, **kwargs):
         """ A := diag(v) """
         v = np.require(v, requirements='F')
@@ -372,6 +378,12 @@ class Backend(object):
         if comm is not None:
             xTx = comm.allreduce( xTx )
         return xTx
+
+    def cgemm(self, y, M, x, alpha, beta, forward):
+        """
+        Peform a dense matrix-matrix multiplication.
+        """
+        raise NotImplementedError()
 
     # -----------------------------------------------------------------------
     # FFT Routines

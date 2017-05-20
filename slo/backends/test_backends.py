@@ -258,3 +258,34 @@ def test_blas_axpy(backend, n, alpha, alpha_i):
     y_act = y_d.to_host()
 
     np.testing.assert_allclose(y_exp, y_act, atol=1e-6)
+
+
+@pytest.mark.parametrize("backend,m,n,k,alpha,beta,forward",
+    product(BACKENDS, [10,23,129,144],
+                      [10,23,129,144],
+                      [10,23,129,144],
+                      [1,0.5,0.0],
+                      [0,0.5,0.0],
+                      [True, False])
+)
+def test_blas_cgemm(backend, m, n, k, alpha, beta, forward):
+    b = backend()
+
+    y = slo.util.rand64c(m,n)
+    M = slo.util.rand64c(m,k)
+    x = slo.util.rand64c(k,n)
+
+    if not forward:
+        x, y = y, x
+        M_exp = np.conj(M.T)
+    else:
+        M_exp = M
+    y_exp = alpha * M_exp.dot(x) + beta * y
+
+    y_d = b.copy_array(y)
+    M_d = b.copy_array(M)
+    x_d = b.copy_array(x)
+    b.cgemm(y_d, M_d, x_d, alpha, beta, forward=forward)
+    y_act = y_d.to_host()
+
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-3)
