@@ -44,6 +44,9 @@ Simple operators implement linear transformations directly via high-performance 
 #### Sparse Matrix (`slo.operators.SpMatrix`)
 ![Sparse Matrix Image](imgs/SparseM.png)
 
+#### Dense Matrix (`slo.operators.DenseMatrix`)
+![Dense Matrix Image](imgs/DenseM.png)
+
 #### DFT Matrix (`slo.operators.UnscaledFFT`)
 ![DFT Matrix Image](imgs/FFT.png)
 Supports 3D FFTs. 1D and 2D TBD.
