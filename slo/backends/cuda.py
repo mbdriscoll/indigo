@@ -365,6 +365,47 @@ class CudaBackend(Backend):
     ) -> cublasStatus_t:
         pass
 
+    def cgemm(self, y, M, x, alpha, beta, forward):
+        """ y = alpha * M * X + beta * Y """
+        assert isinstance(x, self.dndarray)
+        alpha = np.array(alpha, dtype=np.complex64)
+        beta  = np.array( beta, dtype=np.complex64)
+        (m, n), k = y.shape, x.shape[0]
+        lda = M.shape[0]
+        ldb = x.shape[0]
+        ldc = y.shape[0]
+        if forward:
+            transa = CudaBackend.cublasOperator_t.CUBLAS_OP_N
+        else:
+            transa = CudaBackend.cublasOperator_t.CUBLAS_OP_C
+        transb = CudaBackend.cublasOperator_t.CUBLAS_OP_N
+        self.cublasCgemm_v2( self._cublas_handle, transa, transb,
+            m, n, k, alpha, M, lda, x, ldb, beta, y, ldc )
+
+    class cublasOperator_t(c_uint):
+        CUBLAS_OP_N = 0
+        CUBLAS_OP_T = 1
+        CUBLAS_OP_C = 2
+
+    @wrap(cublas)
+    def cublasCgemm_v2(
+        handle : cublasHandle_t,
+        transa : cublasOperator_t,
+        transb : cublasOperator_t,
+        m      : c_int,
+        n      : c_int,
+        k      : c_int,
+        alpha  : ndpointer(dtype=np.complex64, ndim=0),
+        M      : dndarray,
+        lda    : c_int,
+        x      : dndarray,
+        ldb    : c_int,
+        beta   : ndpointer(dtype=np.complex64, ndim=0),
+        y      : dndarray,
+        ldc    : c_int,
+    ) -> cublasStatus_t:
+        pass
+
     # -----------------------------------------------------------------------
     # FFT Routines
     # -----------------------------------------------------------------------
