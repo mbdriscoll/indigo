@@ -204,12 +204,9 @@ class DenseMatrix(Operator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         M_d = self._get_or_create_device_matrix()
-        nbytes = M_d.nbytes + \
-            min( M_d.nnz * x.itemsize, x.nbytes ) + \
-            min( M_d.nnz * y.itemsize, y.nbytes ) * (2 if beta != 0 else 1)
         (m, n), k = M_d.shape, x.shape[1]
         nflops = m * n * k * 5
-        with profile("cgemm", nflops=nflops, nbytes=nbytes):
+        with profile("cgemm", nflops=nflops):
             self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward)
 
 
