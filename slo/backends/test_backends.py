@@ -288,4 +288,4 @@ def test_blas_cgemm(backend, m, n, k, alpha, beta, forward):
     b.cgemm(y_d, M_d, x_d, alpha, beta, forward=forward)
     y_act = y_d.to_host()
 
-    np.testing.assert_allclose(y_exp, y_act, atol=1e-4)
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-3)
