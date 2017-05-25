@@ -94,8 +94,7 @@ assert M == 1, "No support for multiple maps."
 
 Ss = []
 for c in range(C):
-    for m in range(M):
-        S_c = B.Diag( mps[:,:,:,c:c+1], name='map%02d' % c )
+    S_c = B.Diag( mps[:,:,:,c:c+1], name='map%02d' % c )
     Ss.append(S_c)
 
 slc = [0] * dim.NDIM
