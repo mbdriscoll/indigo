@@ -7,8 +7,7 @@ from numpy.ctypeslib import ndpointer
 
 from .backend import Backend
 
-libmkl_rt = cdll.LoadLibrary("libmkl_rt.so")
-#libmkl_rt = cdll.LoadLibrary("/Users/driscoll/.conda3/envs/picsdm/lib/libmkl_rt.dylib")
+libmkl_rt = cdll.LoadLibrary("/opt/intel/compilers_and_libraries_2017.2.174/linux/mkl/lib/intel64/libmkl_rt.so")
 
 class MklBackend(Backend):
 

@@ -166,10 +166,8 @@ class SpMatrix(Operator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         M_d = self._get_or_create_device_matrix()
-        nbytes = M_d.nbytes + \
-            min( M_d.nnz * x.itemsize, x.nbytes ) + \
-            min( M_d.nnz * y.itemsize, y.nbytes ) * (2 if beta != 0 else 1)
-        with profile("spmv", nbytes=nbytes):
+        nbytes = M_d.nbytes + x.nbytes + (y.nbytes * (1 if beta == 0 else 2))
+        with profile("csrmm", nbytes=nbytes):
             if forward:
                 M_d.forward(y, x, alpha=alpha, beta=beta, stream=self.stream)
             else:

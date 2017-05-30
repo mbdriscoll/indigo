@@ -103,6 +103,7 @@ F = B.KronI(T*C, F, name='fft')
 G = B.BlockDiag( [B.KronI(C, Gt) for Gt in Gs], name='interp')
 
 A = G * F * S; A._name = 'SENSE1'
+A = A.optimize()
 AHA = A.H * A
 AHA._name = 'SENSE'
 
