@@ -283,9 +283,6 @@ class Backend(object):
     def CopyOut(self, shape, dtype, **kwargs):
         return op.CopyOut(self, shape, dtype)
 
-    def Allreduce(self, size, team, dtype, **kwargs):
-        return op.Allreduce(self, size, team, dtype=dtype, **kwargs)
-
     def FFT(self, shape, dtype, **kwargs):
         """ Unitary FFT """
         n = np.prod(shape)
