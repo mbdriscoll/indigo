@@ -1,5 +1,5 @@
-import gc
-import time
+import logging
+import os, sys, time
 from ctypes import *
 
 import numpy as np
@@ -7,7 +7,25 @@ from numpy.ctypeslib import ndpointer
 
 from .backend import Backend
 
-libmkl_rt = cdll.LoadLibrary("/opt/intel/compilers_and_libraries_2017.2.174/linux/mkl/lib/intel64/libmkl_rt.so")
+log = logging.getLogger(__name__)
+
+# Find MKL library
+MKLROOT = os.environ.get("MKLROOT", '/opt/intel/mkl')
+for libpath in [
+    'lib/intel64/libmkl_rt.so', # linux
+    'lib/libmkl_rt.dylib',      # macos
+    'lib/libmkl_rt.so',         # anaconda
+]:
+    libmkl_rt_path = os.path.join(MKLROOT, libpath)
+    if os.path.exists( libmkl_rt_path ):
+        log.debug("using MKL library at path <%s>." % libmkl_rt_path)
+        libmkl_rt = cdll.LoadLibrary( libmkl_rt_path )
+        break
+else:
+    log.critical("Could not locate MKL at path <%s>.", MKLROOT)
+    log.critical("Try setting MKLROOT environment variable.")
+    sys.exit(1)
+
 
 class MklBackend(Backend):
 
