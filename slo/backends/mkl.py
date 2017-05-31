@@ -67,6 +67,13 @@ class MklBackend(Backend):
 
         def as_nparray(self):
             return self._arr
+    
+    @wrap
+    def mkl_get_max_threads() -> c_int:
+        pass
+
+    def get_max_threads(self):
+        return self.mkl_get_max_threads()
 
     # -----------------------------------------------------------------------
     # BLAS Routines

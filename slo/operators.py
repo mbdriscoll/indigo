@@ -167,7 +167,8 @@ class SpMatrix(Operator):
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         M_d = self._get_or_create_device_matrix()
         nbytes = M_d.nbytes + x.nbytes + (y.nbytes * (1 if beta == 0 else 2))
-        with profile("csrmm", nbytes=nbytes):
+        nthreads = self._backend.get_max_threads()
+        with profile("csrmm", nbytes=nbytes, nthreads=nthreads):
             if forward:
                 M_d.forward(y, x, alpha=alpha, beta=beta, stream=self.stream)
             else:
@@ -230,10 +231,11 @@ class UnscaledFFT(Operator):
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
 
         u,v,w,batch = X.shape
-        nflops = batch * 5 * u*v*w * np.log2(u*v*w)
-        nbytes = X.nbytes + Y.nbytes
+        nflops = batch * 5 * (u*v*np.log2(w) + u*np.log2(v)*w + np.log2(u)*v*w)
+        nbytes = X.nbytes * 2 + Y.nbytes * 2
+        nthreads = self._backend.get_max_threads()
 
-        with profile("fft", nflops=nflops, nbytes=nbytes):
+        with profile("fft", nflops=nflops, nbytes=nbytes, shape=X.shape, nthreads=nthreads):
             if forward:
                 self._backend.fftn(Y, X, self.stream)
             else:

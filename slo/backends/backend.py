@@ -193,6 +193,9 @@ class Backend(object):
         x_d = self.copy_array(x, name=name)
         return x_d
 
+    def get_max_threads(self):
+        return 1
+
     def mem_usage(self):
         nbytes = 0
         log.info("Memory report:")
