@@ -11,8 +11,8 @@ log = logging.getLogger(__name__)
 
 # Find MKL library
 MKLROOT = os.environ.get("MKLROOT", '/opt/intel/mkl')
-for libext in ['lib', 'lib/intel64']:
-    libmkl_rt_path = os.path.join(MKLROOT, libext, 'libmkl_rt.so')
+for libpath in ['lib/libmkl_rt.dylib', 'lib/intel64/libmkl_rt.so']:
+    libmkl_rt_path = os.path.join(MKLROOT, libpath)
     if os.path.exists( libmkl_rt_path ):
         log.debug("using MKL library at path <%s>." % libmkl_rt_path)
         libmkl_rt = cdll.LoadLibrary( libmkl_rt_path )
