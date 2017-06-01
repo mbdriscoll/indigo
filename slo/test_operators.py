@@ -129,6 +129,40 @@ def test_VStack(backend, stack, M, N, K, density):
 
 @pytest.mark.parametrize("backend,stack,M,N,K,density",
     product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
+def test_HStack(backend, stack, M, N, K, density):
+    b = backend()
+    mats_h = [slo.util.randM(M,N,density) for i in range(stack)]
+    A_h = spp.hstack(mats_h)
+
+    mats_d = [b.SpMatrix(m) for m in mats_h]
+    A = b.HStack(mats_d)
+
+    # forward
+    x = b.rand_array((A.shape[1],K))
+    y = b.rand_array((A.shape[0],K))
+    A.eval(y, x)
+
+    y_exp = A_h @ x.to_host()
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
+
+    # adjoint
+    x = b.rand_array((A.shape[0],K))
+    y = b.rand_array((A.shape[1],K))
+    A.H.eval(y, x)
+
+    y_exp = A_h.H @ x.to_host()
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
+
+    # shape
+    assert A.shape == (M,N*stack)
+    assert A.H.shape == (N*stack,M)
+
+    # dtype
+    assert A.dtype == np.dtype('complex64')
+
+
+@pytest.mark.parametrize("backend,stack,M,N,K,density",
+    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
 def test_BlockDiag(backend, stack, M, N, K, density):
     b = backend()
     mats_h = [slo.util.randM(M,N,density) for i in range(stack)]
