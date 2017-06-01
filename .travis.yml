@@ -20,4 +20,6 @@ install:
 
   - export MKLROOT=$CONDA_PREFIX
 
+  - wget -O scan.h5 "https://drive.google.com/uc?export=download&id=0B3gFEmaelkOoZEtvU19reklkamM" # uwute4_lowres
+
 script: pytest
