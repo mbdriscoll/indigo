@@ -231,7 +231,7 @@ class UnscaledFFT(Operator):
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
 
         u,v,w,batch = X.shape
-        nflops = batch * 5 * (u*v*np.log2(w) + u*np.log2(v)*w + np.log2(u)*v*w)
+        nflops = batch * 5 * u*v*w * np.log2(u*v*w)
         nbytes = X.nbytes * 2 + Y.nbytes * 2
         nthreads = self._backend.get_max_threads()
 

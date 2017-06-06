@@ -65,6 +65,7 @@ class Optimize(Transform):
             #TreeTransformations,
             RealizeMatrices,
             #CoalesceAdjoints,
+            StoreMatricesInAdjointOrder,
         ]
 
         for Step in steps:
@@ -232,3 +233,9 @@ class RealizeMatrices(Transform):
             return SpMatrix( node._backend, K, name=name )
         else:
             return node
+
+class StoreMatricesInAdjointOrder(Transform):
+    def visit_SpMatrix(self, node):
+        """ SpMatrix => Adjoint(SpMatrix.H) """
+        M = node._matrix
+        return SpMatrix( node._backend, M.getH(), name=node._name ).H
