@@ -1,12 +1,9 @@
 import time
 import argparse
-import logging
 import numpy as np
 import scipy.sparse as spp
 
 from slo.util import rand64c, randM, Timer
-
-log = logging.getLogger(__name__)
 
 def benchmark_axpy(backend, args):
     x = rand64c( int(1e9/8) ) # 1 GB
@@ -34,9 +31,11 @@ def benchmark_axpy(backend, args):
 
 
 def benchmark_fft(backend, args):
-    x = rand64c( 660, 286, 423, args.batch )
+    shape = (660, 286, 423)
+    x = rand64c( np.prod(shape), args.batch )
     y = np.zeros_like(x)
 
+    F = backend.UnscaledFFT( shape, dtype=x.dtype )
     x_d = backend.copy_array(x)
     y_d = backend.copy_array(y)
 
@@ -44,7 +43,7 @@ def benchmark_fft(backend, args):
     for trial in range(args.trials):
         backend.barrier()
         with timer:
-            backend.fftn(y_d, x_d)
+            F.eval(y_d, x_d)
             backend.barrier()
 
     XYZ = np.prod(x.shape[:3])
