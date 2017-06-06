@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+import numpy.testing as npt
 import scipy.sparse as spp
 from itertools import product
 
@@ -67,4 +68,4 @@ def test_StoreMatricesInAdjointOrder(backend, M, N, K, density):
     A.eval(y_exp, x)
     AHH.eval(y_act, x)
 
-    np.testing.assert_allclose( y_exp.to_host(), y_act.to_host(), rtol=1e-4 )
+    npt.assert_allclose( y_exp.to_host(), y_act.to_host(), rtol=1e-4 )
