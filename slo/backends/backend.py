@@ -196,6 +196,9 @@ class Backend(object):
     def get_max_threads(self):
         return 1
 
+    def barrier(self):
+        pass
+
     def mem_usage(self):
         nbytes = 0
         log.info("Memory report:")

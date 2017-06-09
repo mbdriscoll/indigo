@@ -109,6 +109,9 @@ class CudaBackend(Backend):
     cudaMemcpy.DeviceToDevice =   3
     cudaMemcpy.Default        =   4
 
+    def barrier(self):
+        self._backend.cudaDeviceSynchronize()
+
     # -----------------------------------------------------------------------
     # Arrays
     # -----------------------------------------------------------------------
