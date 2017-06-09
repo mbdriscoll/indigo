@@ -77,7 +77,7 @@ class Backend(object):
         def ndim(self):
             return len(self.shape)
 
-        def copy_from(self, arr, stream=0):
+        def copy_from(self, arr):
             ''' copy from device when both arrays exist '''
             assert isinstance(arr, np.ndarray)
             if self.size != arr.size:
@@ -89,9 +89,9 @@ class Backend(object):
             if not arr.flags['F_CONTIGUOUS']:
                 raise TypeError("order mismatch, expected 'F' got {}" \
                     .format(arr.flags['F_CONTIGUOUS']))
-            self._copy_from(arr, stream=stream)
+            self._copy_from(arr)
 
-        def copy_to(self, arr, stream=0):
+        def copy_to(self, arr):
             ''' copy to device when both arrays exist '''
             assert isinstance(arr, np.ndarray)
             if self.size != arr.size:
@@ -100,7 +100,7 @@ class Backend(object):
             if self.dtype != arr.dtype:
                 raise TypeError("dtype mismatch, expected {} got {}" \
                     .format(self.dtype, arr.dtype))
-            self._copy_to(arr, stream=stream)
+            self._copy_to(arr)
 
         def to_host(self):
             ''' copy from device when host array doesnt exist '''
@@ -108,14 +108,14 @@ class Backend(object):
             self.copy_to(arr)
             return arr
 
-        def copy(self, other=None, name='', stream=0):
+        def copy(self, other=None, name=''):
             ''' copy array on device'''
             if other:
                 assert isinstance(other, self._backend.dndarray)
-                self._copy(other, stream=stream)
+                self._copy(other)
             else:
                 other = self._backend.zero_array(self.shape, self.dtype, name=name)
-                other._copy(self, stream=stream)
+                other._copy(self)
                 return other
 
         @classmethod
@@ -145,12 +145,12 @@ class Backend(object):
             raise NotImplementedError()
 
         @abc.abstractmethod
-        def _copy_from(self, arr, stream=None):
+        def _copy_from(self, arr):
             """ copy HtoD implementation """
             raise NotImplementedError()
 
         @abc.abstractmethod
-        def _copy_to(self, arr, stream=None):
+        def _copy_to(self, arr):
             """ copy DtoH implementation """
             raise NotImplementedError()
 
@@ -208,28 +208,6 @@ class Backend(object):
             if n > 1e6:
                 log.info("  %40s: % 3.0f MB, %20s, %15s", name, n/1e6, shape, dtype)
         return nbytes
-
-    # -----------------------------------------------------------------------
-    # Synchronization
-    # -----------------------------------------------------------------------
-
-    def barrier(self):
-        """ wait for everything to finish """
-        pass
-
-    class _Stream(object):
-        def __init__(self, backend, name):
-            self._backend = backend
-
-        def wait_for(self, events):
-            pass
-
-        def signal(self):
-            pass
-
-    def Stream(self, name):
-        return self._Stream(self, name)
-
 
     # -----------------------------------------------------------------------
     # Operator Building Interface 
@@ -393,21 +371,21 @@ class Backend(object):
     # -----------------------------------------------------------------------
 
     @abc.abstractmethod
-    def fftn(self, y, x, stream=0):
+    def fftn(self, y, x):
         """
         Peform an unscaled multidimensional forward FFT on x.
         """
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def ifftn(self, y, x, stream=0):
+    def ifftn(self, y, x):
         """
         Peform an unscaled multidimensional inverse FFT on x.
         """
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha=1, beta=0, adjoint=False, stream=None):
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha=1, beta=0, adjoint=False):
         """
         Computes Y[:] = A * X.
         """
@@ -433,17 +411,17 @@ class Backend(object):
             self.shape = A.shape
             self.dtype = A.dtype
 
-        def forward(self, y, x, alpha=1, beta=0, stream=0):
+        def forward(self, y, x, alpha=1, beta=0):
             """ y[:] = A * x """
             self._backend.ccsrmm(y,
                 self.shape, self.colInds, self.rowPtrs, self.values,
-                x, alpha=alpha, beta=beta, adjoint=False, stream=stream)
+                x, alpha=alpha, beta=beta, adjoint=False)
 
-        def adjoint(self, y, x, alpha=1, beta=0, stream=0):
+        def adjoint(self, y, x, alpha=1, beta=0):
             """ y[:] = A.H * x """
             self._backend.ccsrmm(y,
                 self.shape, self.colInds, self.rowPtrs, self.values,
-                x, alpha=alpha, beta=beta, adjoint=True, stream=stream)
+                x, alpha=alpha, beta=beta, adjoint=True)
 
         @property
         def nbytes(self):
