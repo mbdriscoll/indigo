@@ -162,7 +162,7 @@ class CudaBackend(Backend):
             ptr = self._arr.value + idx * np.dtype(self.dtype).itemsize
             ptr = c_ulong(ptr)
             ld = self._leading_dims
-            return self._backend.dndarray(self._backend, shape,
+            return self._backend.dndarray(self._backend, tuple(shape),
                 self.dtype, ld=ld, own=False, data=ptr)
 
         @staticmethod

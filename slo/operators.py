@@ -203,11 +203,12 @@ class DenseMatrix(Operator):
 
 
 class UnscaledFFT(Operator):
-    def __init__(self, backend, ft_shape, dtype=np.dtype('complex64'), forward=True, **kwargs):
+    def __init__(self, backend, ft_shape, dtype=np.dtype('complex64'), forward=True, batch_size=None, **kwargs):
         super().__init__(backend, **kwargs)
         self._ft_shape = ft_shape
         self._default_batch = 1
         self._dtype = dtype
+        self._batch_size = batch_size
 
     @property
     def shape(self):
@@ -223,16 +224,22 @@ class UnscaledFFT(Operator):
         X = x.reshape( self._ft_shape + (x.shape[1],) )
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
 
-        u,v,w,batch = X.shape
-        nflops = batch * 5 * u*v*w * np.log2(u*v*w)
-        nbytes = X.nbytes * 2 + Y.nbytes * 2
-        nthreads = self._backend.get_max_threads()
+        batch = X.shape[3]
+        bs = self._batch_size if self._batch_size != None else batch
+        for b in range(0, batch, bs):
+            u,v,w,batch = X.shape
+            nflops = batch * 5 * u*v*w * np.log2(u*v*w)
+            nbytes = X.nbytes * 2 + Y.nbytes * 2
+            nthreads = self._backend.get_max_threads()
 
-        with profile("fft", nflops=nflops, nbytes=nbytes, shape=X.shape, nthreads=nthreads):
-            if forward:
-                self._backend.fftn(Y, X)
-            else:
-                self._backend.ifftn(Y, X)
+            batch_max = min(b + bs, batch)
+            slc = slice(b, batch_max)
+
+            with profile("fft", nflops=nflops, nbytes=nbytes, shape=X.shape, nthreads=nthreads):
+                if forward:
+                    self._backend.fftn(Y[:,:,:,slc], X[:,:,:,slc])
+                else:
+                    self._backend.ifftn(Y[:,:,:,slc], X[:,:,:,slc])
 
     def _mem_usage(self):
         return 0
@@ -357,9 +364,10 @@ class HStack(CompositeOperator):
         super()._adopt(children)
 
 class Product(CompositeOperator):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, batch_size=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._intermediate = None
+        self._batch_size = batch_size
         self._name = "{}*{}".format(self.left._name, self.right._name)
 
     @property
@@ -385,7 +393,8 @@ class Product(CompositeOperator):
 
     def _get_or_create_intermediate(self, batch, dtype):
         if self._intermediate is None:
-            intermediate_shape = (self._children[0].shape[1], batch)
+            batch_size = min(self._batch_size, batch) if self._batch_size != None else batch
+            intermediate_shape = (self._children[0].shape[1], batch_size)
             arr_name = "%s intermediate" % self._name
             arr = self._backend.zero_array( intermediate_shape, dtype, name=arr_name )
             self._intermediate = arr
@@ -395,12 +404,17 @@ class Product(CompositeOperator):
         batch = x.shape[1]
         tmp = self._get_or_create_intermediate( batch, x.dtype )
         L, R = self._children
-        if forward:
-            R.eval(tmp, x, alpha=alpha, beta=0, forward=True)
-            L.eval(y, tmp, alpha=1,  beta=beta, forward=True)
-        else:
-            L.eval(tmp, x, alpha=alpha, beta=0, forward=False)
-            R.eval(y, tmp, alpha=1,  beta=beta, forward=False)
+        bs = self._batch_size if self._batch_size != None else batch
+        for b in range(0, batch, bs):
+            batch_max = min(b + bs, batch)
+            slc = slice(b, batch_max)
+            tslc = slice(0, batch_max - b)
+            if forward:
+                R.eval(tmp[:,tslc], x[:,slc], alpha=alpha, beta=0, forward=True)
+                L.eval(y[:,slc], tmp[:,tslc], alpha=1,  beta=beta, forward=True)
+            else:
+                L.eval(tmp[:,tslc], x[:,slc], alpha=alpha, beta=0, forward=False)
+                R.eval(y[:,slc], tmp[:,tslc], alpha=1,  beta=beta, forward=False)
 
     def _mem_usage(self):
         return getattr(self._intermediate, 'nbytes', 0)

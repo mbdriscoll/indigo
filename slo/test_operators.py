@@ -51,15 +51,16 @@ def test_SpMatrix(backend, M, N, K, density, alpha, beta):
     assert A.dtype == np.dtype('complex64')
 
 
-@pytest.mark.parametrize("backend,L,M,N,K,density,alpha,beta",
-    product( BACKENDS, [3,4], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
-def test_Product(backend, L, M, N, K, density, alpha, beta):
+@pytest.mark.parametrize("backend,L,M,N,K,density,alpha,beta,batch_size",
+    product( BACKENDS, [3,4], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1], [1, 3, 4, None] ))
+def test_Product(backend, L, M, N, K, density, alpha, beta, batch_size):
     b = backend()
     A0_h = slo.util.randM(L, M, density)
     A1_h = slo.util.randM(M, N, density)
     A0 = b.SpMatrix(A0_h, name='A0')
     A1 = b.SpMatrix(A1_h, name='A1')
     A = A0 * A1
+    A._batch_size = batch_size
 
     # forward
     x = b.rand_array((N,K))
@@ -211,10 +212,10 @@ def test_KronI(backend, stack, M, N, K, density, alpha, beta):
     assert A.dtype == np.dtype('complex64')
 
 
-@pytest.mark.parametrize("backend,M,N,K,B",
-    product( BACKENDS, [22,23,24], [22,23,24], [22,23,24], [1,2,3,8])
+@pytest.mark.parametrize("backend,M,N,K,B,batch_size",
+    product( BACKENDS, [22,23,24], [22,23,24], [22,23,24], [1,2,3,8], [1, 3, 4, None])
 )
-def test_UnscaledFFT(backend, M, N, K, B ):
+def test_UnscaledFFT(backend, M, N, K, B, batch_size ):
     b = backend()
 
     # forward
@@ -222,7 +223,7 @@ def test_UnscaledFFT(backend, M, N, K, B ):
     y = b.rand_array( (M*N*K, B) )
     x_h = x.to_host().reshape( (M,N,K,B), order='F' )
 
-    A = b.UnscaledFFT( (M,N,K), dtype=x.dtype )
+    A = b.UnscaledFFT( (M,N,K), dtype=x.dtype, batch_size=batch_size )
 
     A.eval(y, x)
 
