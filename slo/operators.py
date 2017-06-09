@@ -324,32 +324,21 @@ class HStack(CompositeOperator):
             return self._eval_adjoint(y, x, alpha, beta)
 
     def _eval_forward(self, y, x, alpha=1, beta=0):
-        assert beta in (0, 1)
-        if beta == 0:
-            y._zero()
+        self._backend.scale(y, beta)
         w_offset = 0
-        accum = self._backend.zero_array( y.shape, y.dtype ) # TODO cache dynamic malloc
-        last_signal = self.signal()
         for C in self._children:
             w = C.shape[1]
             slc = slice( w_offset, w_offset+w )
-            last_signal = C.eval( accum, x[slc,:], alpha=alpha, beta=1, forward=True, wait_for=last_signal )
+            C.eval( y, x[slc,:], alpha=alpha, beta=1, forward=True)
             w_offset += w
-        self.signal(after=[last_signal])
-        y.copy(accum, self.stream)
-        del accum
 
     def _eval_adjoint(self, y, x, alpha=1, beta=0):
         w_offset = 0
-        children_done = []
-        ready = self.signal()
         for C in self._children:
             w = C.shape[1]
             slc = slice( w_offset, w_offset+w )
-            child_done = C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=False, wait_for=ready )
+            C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=False)
             w_offset += w
-            children_done.append(child_done)
-        self.signal(after=children_done)
 
     def _adopt(self, children):
         heights = [child.shape[0] for child in children]
