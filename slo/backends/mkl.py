@@ -10,7 +10,10 @@ from .backend import Backend
 log = logging.getLogger(__name__)
 
 # Find MKL library
-MKLROOT = os.environ.get("MKLROOT", '/opt/intel/mkl')
+MKLROOT = os.environ.get("MKLROOT", None)
+if MKLROOT == None:
+    MKLROOT = os.environ.get("CONDA_PREFIX", '/opt/intel/mkl')
+
 for libpath in [
     'lib/intel64/libmkl_rt.so', # linux
     'lib/libmkl_rt.dylib',      # macos
