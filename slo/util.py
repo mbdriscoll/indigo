@@ -38,9 +38,17 @@ class profile(object):
         self._kwargs = kwargs
 
     def __enter__(self):
+        if log.level > logging.DEBUG:
+            return
+
+        self._backend.barrier()
         self._start = time.time()
 
     def __exit__(self, exc_type, exc_value, traceback):
+        if log.level > logging.DEBUG:
+            return
+
+        self._backend.barrier()
         data = dict(
             duration = time.time() - self._start,
             event    = self._event,

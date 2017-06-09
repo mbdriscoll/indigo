@@ -166,7 +166,6 @@ class SpMatrix(Operator):
                 M_d.forward(y, x, alpha=alpha, beta=beta)
             else:
                 M_d.adjoint(y, x, alpha=alpha, beta=beta)
-            self._backend.barrier()
 
 
 class DenseMatrix(Operator):
@@ -234,7 +233,6 @@ class UnscaledFFT(Operator):
                 self._backend.fftn(Y, X)
             else:
                 self._backend.ifftn(Y, X)
-            self._backend.barrier()
 
     def _mem_usage(self):
         return 0
