@@ -12,10 +12,9 @@ log = logging.getLogger(__name__)
 class Operator(object):
     def __init__(self, backend, name=''):
         self._backend = backend
-        self._stream = None
         self._name = name
 
-    def eval(self, y, x, alpha=1, beta=0, forward=True, wait_for=None):
+    def eval(self, y, x, alpha=1, beta=0, forward=True):
         """ y = A * x """
         if x.ndim == 1: x = x.reshape( (x.shape[0], 1) )
         if y.ndim == 1: y = y.reshape( (y.shape[0], 1) )
@@ -28,9 +27,7 @@ class Operator(object):
         if not( x.dtype == self.dtype == y.dtype ):
             raise ValueError("Dtype mismatch: attemping {} = {} * {}".format(
                 y.dtype, self.dtype, x.dtype))
-        self.signal(after=wait_for)
         self._eval(y, x, alpha=alpha, beta=beta, forward=forward)
-        return self.signal()
 
     @property
     def shape(self):
@@ -39,12 +36,6 @@ class Operator(object):
     @property
     def dtype(self):
         raise NotImplemented()
-
-    @property
-    def stream(self):
-        if self._stream is None:
-            self._stream = self._backend.Stream(self._name)
-        return self._stream
 
     def __mul__(self, other):
         if isinstance(other, Operator):
@@ -63,11 +54,6 @@ class Operator(object):
     @property
     def H(self):
         return Adjoint(self._backend, self, name=self._name+".H")
-
-    def signal(self, after=None):
-        if after:
-            self.stream.wait_for(after)
-        return self.stream.signal()
 
     def dump(self):
         """
@@ -133,9 +119,8 @@ class Adjoint(CompositeOperator):
     def H(self):
         return self.child
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True, wait_for=None):
-        return self.child.eval( y, x, alpha, beta, forward=not forward, wait_for=wait_for )
-
+    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+        self.child.eval( y, x, alpha, beta, forward=not forward)
 
 
 class SpMatrix(Operator):
@@ -170,9 +155,9 @@ class SpMatrix(Operator):
         nthreads = self._backend.get_max_threads()
         with profile("csrmm", nbytes=nbytes, nthreads=nthreads):
             if forward:
-                M_d.forward(y, x, alpha=alpha, beta=beta, stream=self.stream)
+                M_d.forward(y, x, alpha=alpha, beta=beta)
             else:
-                M_d.adjoint(y, x, alpha=alpha, beta=beta, stream=self.stream)
+                M_d.adjoint(y, x, alpha=alpha, beta=beta)
 
 
 class DenseMatrix(Operator):
@@ -237,9 +222,9 @@ class UnscaledFFT(Operator):
 
         with profile("fft", nflops=nflops, nbytes=nbytes, shape=X.shape, nthreads=nthreads):
             if forward:
-                self._backend.fftn(Y, X, self.stream)
+                self._backend.fftn(Y, X)
             else:
-                self._backend.ifftn(Y, X, self.stream)
+                self._backend.ifftn(Y, X)
 
     def _mem_usage(self):
         return 0
@@ -259,9 +244,7 @@ class KronI(CompositeOperator):
         cb = self._c * x.shape[1]
         X = x.reshape( (x.size // cb, cb) )
         Y = y.reshape( (y.size // cb, cb) )
-        ready = self.signal()
-        done = self.child.eval(Y, X, alpha=alpha, beta=beta, forward=forward, wait_for=ready)
-        self.signal(after=[done])
+        self.child.eval(Y, X, alpha=alpha, beta=beta, forward=forward)
 
 
 class BlockDiag(CompositeOperator):
@@ -275,17 +258,13 @@ class BlockDiag(CompositeOperator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         h_offset, w_offset = 0, 0
-        child_signals = []
-        ready = self.signal()
         for C in self._children:
             h, w = C.shape if forward else reversed(C.shape)
             slc_x = slice( w_offset, w_offset+w )
             slc_y = slice( h_offset, h_offset+h )
-            child_signal = C.eval( y[slc_y,:], x[slc_x,:], alpha=alpha, beta=beta, forward=forward, wait_for=ready)
+            C.eval( y[slc_y,:], x[slc_x,:], alpha=alpha, beta=beta, forward=forward)
             h_offset += h
             w_offset += w
-            child_signals.append(child_signal)
-        self.signal(after=child_signals)
 
 
 class VStack(CompositeOperator):
@@ -305,15 +284,11 @@ class VStack(CompositeOperator):
 
     def _eval_forward(self, y, x, alpha=1, beta=0):
         h_offset = 0
-        children_done = []
-        ready = self.signal()
         for C in self._children:
             h = C.shape[0]
             slc = slice( h_offset, h_offset+h )
-            child_done = C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=True, wait_for=ready )
+            C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=True)
             h_offset += h
-            children_done.append(child_done)
-        self.signal(after=children_done)
 
     def _eval_adjoint(self, y, x, alpha=1, beta=0):
         assert beta in (0,1)
@@ -321,14 +296,12 @@ class VStack(CompositeOperator):
             y._zero()
         w_offset = 0
         accum = self._backend.zero_array( y.shape, y.dtype ) # TODO cache dynamic malloc
-        last_signal = self.signal()
         for C in self._children:
             w = C.shape[0]
             slc = slice( w_offset, w_offset+w )
-            last_signal = C.eval( accum, x[slc,:], alpha=alpha, beta=1, forward=False, wait_for=last_signal )
+            C.eval( accum, x[slc,:], alpha=alpha, beta=1, forward=False)
             w_offset += w
-        self.signal(after=[last_signal])
-        y.copy(accum, self.stream)
+        y.copy(accum)
         del accum
 
     def _adopt(self, children):
@@ -429,15 +402,13 @@ class Product(CompositeOperator):
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         batch = x.shape[1]
         tmp = self._get_or_create_intermediate( batch, x.dtype )
-        last_signal = self.signal()
         L, R = self._children
         if forward:
-            r_sig = R.eval(tmp, x, alpha=alpha, beta=0, forward=True, wait_for=last_signal)
-            done  = L.eval(y, tmp, alpha=1,  beta=beta, forward=True, wait_for=r_sig)
+            R.eval(tmp, x, alpha=alpha, beta=0, forward=True)
+            L.eval(y, tmp, alpha=1,  beta=beta, forward=True)
         else:
-            l_sig = L.eval(tmp, x, alpha=alpha, beta=0, forward=False, wait_for=last_signal)
-            done  = R.eval(y, tmp, alpha=1,  beta=beta, forward=False, wait_for=l_sig)
-        self.signal(after=done)
+            L.eval(tmp, x, alpha=alpha, beta=0, forward=False)
+            R.eval(y, tmp, alpha=1,  beta=beta, forward=False)
 
     def _mem_usage(self):
         return getattr(self._intermediate, 'nbytes', 0)
