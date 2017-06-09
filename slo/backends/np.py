@@ -12,13 +12,13 @@ class NumpyBackend(Backend):
     # Arrays
     # -----------------------------------------------------------------------
     class dndarray(Backend.dndarray):
-        def _copy_from(self, arr, stream=0):
+        def _copy_from(self, arr):
             self._arr.flat[:] = arr.flat
 
-        def _copy_to(self, arr, stream=0):
+        def _copy_to(self, arr):
             arr.flat[:] = self._arr.flat
 
-        def _copy(self, d_arr, stream=0):
+        def _copy(self, d_arr):
             dst = self._arr.reshape(-1, order='F')
             src = d_arr._arr.reshape(-1, order='F')
             dst.flat[:] = src.flat
@@ -80,12 +80,12 @@ class NumpyBackend(Backend):
     # -----------------------------------------------------------------------
     # FFT Routines
     # -----------------------------------------------------------------------
-    def fftn(self, y, x, stream=None):
+    def fftn(self, y, x):
         X = x._arr.reshape( x.shape, order='F' )
         Y = y._arr.reshape( y.shape, order='F' )
         Y[:] = np.fft.fftn(X, axes=(0,1,2))
 
-    def ifftn(self, y, x, stream=None):
+    def ifftn(self, y, x):
         scale = np.prod(x.shape[:3])
         X = x._arr.reshape( x.shape, order='F' )
         Y = y._arr.reshape( y.shape, order='F' )
@@ -94,7 +94,7 @@ class NumpyBackend(Backend):
     # -----------------------------------------------------------------------
     # CSRMM Routine
     # -----------------------------------------------------------------------
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, stream=None):
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False):
         A = spp.csr_matrix((A_vals._arr, A_indx._arr, A_ptr._arr), shape=A_shape)
         X = x._arr.reshape( x.shape, order='F')
         Y = y._arr.reshape( y.shape, order='F')

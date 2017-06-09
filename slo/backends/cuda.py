@@ -37,10 +37,6 @@ class CudaBackend(Backend):
         self.cudaGetDevice( byref(cu_device) )
         log.info("using CUDA device #%d", cu_device.value)
 
-    # -----------------------------------------------------------------------
-    # Synchronization
-    # -----------------------------------------------------------------------
-
     class cudaError_t(c_long):
         def _check(self, backend, fn):
             if self.value != 0:
@@ -49,49 +45,6 @@ class CudaBackend(Backend):
                 log.critical("%s returned exit code %d: %s (%s)",
                     fn.__name__, self.value, name, desc)
                 raise RuntimeError
-
-
-    class cudaEvent_t(c_void_p):
-        def __init__(self, backend):
-            super()
-            self._backend = backend
-            self._backend.cudaEventCreate( byref(self) )
-
-        def __del__(self):
-            self._backend.cudaEventDestroy(self)
-
-        def record(self, stream):
-            self._backend.cudaEventRecord( self, stream )
-
-
-    class cudaStream_t(c_void_p):
-
-        def __init__(self, backend, name):
-            super().__init__()
-            self._backend = backend
-            backend.cudaStreamCreate( byref(self) )
-            backend.nvtxNameCudaStreamA(self, name.encode('ascii'))
-
-        def wait_for(self, events):
-            if isinstance(events, self._backend.cudaEvent_t):
-                events = [events]
-            for event in events:
-                self._backend.cudaStreamWaitEvent(self, event, 0)
-
-        def __del__(self):
-            self._backend.cudaStreamDestroy(self)
-
-        def signal(self):
-            evt = self._backend.cudaEvent_t(self._backend)
-            evt.record(self)
-            return evt
-
-
-    _Stream = cudaStream_t
-
-    def barrier(self):
-        """ wait for everything to finish """
-        self.cudaDeviceSynchronize()
 
     def wrap(lib):
         def wrapper(fn):
@@ -105,44 +58,6 @@ class CudaBackend(Backend):
                 return res
             return wrapped
         return wrapper
-
-    @wrap(nvtx)
-    def nvtxNameCudaStreamA( stream: cudaStream_t, name: c_char_p ) -> cudaError_t:
-        pass
-
-    @wrap(cudart)
-    def cudaStreamCreate( stream : POINTER(cudaStream_t) ) -> cudaError_t:
-        pass
-
-    @wrap(cudart)
-    def cudaStreamDestroy( stream : cudaStream_t ) -> cudaError_t:
-        pass
-
-    @wrap(cudart)
-    def cudaStreamWaitEvent(
-        stream : cudaStream_t,
-        event  : cudaEvent_t,
-        flags  : c_uint,
-    ) -> cudaError_t:
-        pass
-
-    @wrap(cudart)
-    def cudaEventCreate(
-        event : POINTER(cudaEvent_t),
-    ) -> cudaError_t:
-        pass
-
-    @wrap(cudart)
-    def cudaEventDestroy( event : cudaEvent_t ) -> cudaError_t:
-        pass
-
-    @wrap(cudart)
-    def cudaEventRecord(
-        event : cudaEvent_t,
-        stream : cudaStream_t,
-    ) -> cudaError_t:
-        pass
-
 
     @wrap(cudart)
     def cudaSetDevice(device : c_int) -> cudaError_t:
@@ -181,16 +96,6 @@ class CudaBackend(Backend):
         pass
 
     @wrap(cudart)
-    def cudaMemcpyAsync(
-        dst   : c_ulong,
-        src   : c_ulong,
-        count : c_size_t,
-        kind  : c_int,
-        stream: cudaStream_t,
-    ) -> cudaError_t:
-        pass
-
-    @wrap(cudart)
     def cudaMemset(
         devPtr : c_ulong,
         size   : c_int,
@@ -208,24 +113,21 @@ class CudaBackend(Backend):
     # Arrays
     # -----------------------------------------------------------------------
     class dndarray(Backend.dndarray):
-        def _copy_from(self, arr, stream=0):
+        def _copy_from(self, arr):
             src, dst = arr.ctypes.data, self._arr
             size, kind = arr.nbytes, CudaBackend.cudaMemcpy.HostToDevice
             self._backend.cudaMemcpy(dst, src, size, kind)
-            #self._backend.cudaMemcpyAsync(dst, src, size, kind, stream)
 
-        def _copy_to(self, arr, stream=0):
+        def _copy_to(self, arr):
             assert arr.flags['F_CONTIGUOUS']
             src, dst = self._arr, arr.ctypes.data
             size, kind = arr.nbytes, CudaBackend.cudaMemcpy.DeviceToHost
             self._backend.cudaMemcpy(dst, src, size, kind)
-            #self._backend.cudaMemcpyAsync(dst, src, size, kind, stream)
 
-        def _copy(self, d_arr, stream=0):
+        def _copy(self, d_arr):
             src, dst = d_arr._arr, self._arr
             size, kind = self.nbytes, CudaBackend.cudaMemcpy.DeviceToDevice
             self._backend.cudaMemcpy(dst, src, size, kind)
-            #self._backend.cudaMemcpyAsync(dst, src, size, kind, stream)
 
         def _malloc(self, shape, dtype):
             _arr = c_ulong()
@@ -474,13 +376,6 @@ class CudaBackend(Backend):
     ) -> cufftResult_t:
         pass
 
-    @wrap(cufft)
-    def cufftSetStream(
-        plan : cufftHandle_t,
-        stream : cudaStream_t,
-    ) -> cufftResult_t:
-        pass
-
     def _get_or_create_plan(self, x):
         key = (x.shape, x.dtype)
         if key not in self._fft_plans:
@@ -493,14 +388,12 @@ class CudaBackend(Backend):
             self._fft_plans[key] = plan
         return self._fft_plans[key]
 
-    def fftn(self, y, x, stream=0):
+    def fftn(self, y, x):
         plan = self._get_or_create_plan(x)
-        self.cufftSetStream(plan, stream)
         self.cufftExecC2C(plan, x, y, CudaBackend.CUFFT_FORWARD)
 
-    def ifftn(self, y, x, stream=0):
+    def ifftn(self, y, x):
         plan = self._get_or_create_plan(x)
-        self.cufftSetStream(plan, stream)
         self.cufftExecC2C(plan, x, y, CudaBackend.CUFFT_INVERSE)
 
     # -----------------------------------------------------------------------
@@ -565,13 +458,6 @@ class CudaBackend(Backend):
         pass
 
     @wrap(cusparse)
-    def cusparseSetStream(
-        handle : cusparseHandle_t,
-        stream : cudaStream_t,
-    ) -> cusparseStatus_t:
-        pass
-
-    @wrap(cusparse)
     def cusparseCcsrmm(
         handle     : cusparseHandle_t,
         transA     : cusparseOperation_t,
@@ -592,7 +478,7 @@ class CudaBackend(Backend):
     ) -> cusparseStatus_t:
         pass
 
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, stream=0):
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False):
         m, k = A_shape
         n = x.shape[1]
         ldx = x._leading_dims[0]
@@ -603,7 +489,6 @@ class CudaBackend(Backend):
             trans = self.CUSPARSE_OPERATION_NON_TRANSPOSE
         alpha = c_complex(alpha)
         beta  = c_complex(beta)
-        self.cusparseSetStream( self._cusparse_handle, stream )
         self.cusparseCcsrmm( self._cusparse_handle, trans, m, n, k,
             A_vals.size, (alpha), self._mat_descr,
             A_vals, A_ptr, A_indx, x, ldx, (beta), y, ldy

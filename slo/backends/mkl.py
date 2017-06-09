@@ -10,7 +10,10 @@ from .backend import Backend
 log = logging.getLogger(__name__)
 
 # Find MKL library
-MKLROOT = os.environ.get("MKLROOT", '/opt/intel/mkl')
+MKLROOT = os.environ.get("MKLROOT", None)
+if MKLROOT == None:
+    MKLROOT = os.environ.get("CONDA_PREFIX", '/opt/intel/mkl')
+
 for libpath in [
     'lib/intel64/libmkl_rt.so', # linux
     'lib/libmkl_rt.dylib',      # macos
@@ -48,13 +51,13 @@ class MklBackend(Backend):
     # Arrays
     # -----------------------------------------------------------------------
     class dndarray(Backend.dndarray):
-        def _copy_from(self, arr, stream=0):
+        def _copy_from(self, arr):
             self._arr.flat[:] = arr.flat
 
-        def _copy_to(self, arr, stream=0):
+        def _copy_to(self, arr):
             arr.flat[:] = self._arr.flat
 
-        def _copy(self, d_arr, stream=0):
+        def _copy(self, d_arr):
             dst = self._arr.reshape(-1, order='F')
             src = d_arr._arr.reshape(-1, order='F')
             dst.flat[:] = src.flat
@@ -248,11 +251,11 @@ class MklBackend(Backend):
             self._fft_descs[key] = desc
         return self._fft_descs[key]
 
-    def fftn(self, y, x, stream=None):
+    def fftn(self, y, x):
         desc = self._get_or_create_fft_desc( x, axes=(0,1,2) )
         self.DftiComputeForward( desc, x, y )
 
-    def ifftn(self, y, x, stream=None):
+    def ifftn(self, y, x):
         desc = self._get_or_create_fft_desc( x, axes=(0,1,2) )
         self.DftiComputeBackward( desc, x, y )
 
@@ -338,7 +341,7 @@ class MklBackend(Backend):
     ) -> c_void_p :
         pass
 
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, stream=None):
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False):
         transA = create_string_buffer(1)
         if adjoint:
             transA[0] = b'C'

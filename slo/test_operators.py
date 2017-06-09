@@ -8,9 +8,9 @@ import slo
 from slo.backends import available_backends
 BACKENDS = available_backends()
 
-@pytest.mark.parametrize("backend,M,N,K,density",
-    product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0.01,0.1,0.5,1] ))
-def test_SpMatrix(backend, M, N, K, density):
+@pytest.mark.parametrize("backend,M,N,K,density,alpha,beta",
+    product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
+def test_SpMatrix(backend, M, N, K, density, alpha, beta):
     b = backend()
     A_h = slo.util.randM(M, N, density)
     A = b.SpMatrix(A_h)
@@ -18,34 +18,30 @@ def test_SpMatrix(backend, M, N, K, density):
     # forward
     x = b.rand_array((N,K))
     y = b.rand_array((M,K))
-    A.eval(y, x)
-    x_h = x.to_host()
-    y_h = y.to_host()
-    npt.assert_allclose(y_h, A_h * x_h, rtol=1e-5)
+    y_exp = beta * y.to_host() + alpha * A_h * x.to_host()
+    A.eval(y, x, alpha=alpha, beta=beta)
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # adjoint
     x = b.rand_array((M,K))
     y = b.rand_array((N,K))
-    A.H.eval(y, x)
-    x_h = x.to_host()
-    y_h = y.to_host()
-    npt.assert_allclose(y_h, A_h.H * x_h, rtol=1e-5)
+    y_exp = beta * y.to_host() + alpha * A_h.H * x.to_host()
+    A.H.eval(y, x, alpha=alpha, beta=beta)
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # double adjoint
     x = b.rand_array((N,K))
     y = b.rand_array((M,K))
-    A.H.H.eval(y, x)
-    x_h = x.to_host()
-    y_h = y.to_host()
-    npt.assert_allclose(y_h, A_h * x_h, rtol=1e-5)
+    y_exp = beta * y.to_host() + alpha * A_h.H.H * x.to_host()
+    A.H.H.eval(y, x, alpha=alpha, beta=beta)
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # triple adjoint
     x = b.rand_array((M,K))
     y = b.rand_array((N,K))
-    A.H.H.H.eval(y, x)
-    x_h = x.to_host()
-    y_h = y.to_host()
-    npt.assert_allclose(y_h, A_h.H * x_h, rtol=1e-5)
+    y_exp = beta * y.to_host() + alpha * A_h.H.H.H * x.to_host()
+    A.H.H.H.eval(y, x, alpha=alpha, beta=beta)
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # shape
     assert A.shape == (M,N)
@@ -55,9 +51,9 @@ def test_SpMatrix(backend, M, N, K, density):
     assert A.dtype == np.dtype('complex64')
 
 
-@pytest.mark.parametrize("backend,L,M,N,K,density",
-    product( BACKENDS, [3,4], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
-def test_Product(backend, L, M, N, K, density):
+@pytest.mark.parametrize("backend,L,M,N,K,density,alpha,beta",
+    product( BACKENDS, [3,4], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
+def test_Product(backend, L, M, N, K, density, alpha, beta):
     b = backend()
     A0_h = slo.util.randM(L, M, density)
     A1_h = slo.util.randM(M, N, density)
@@ -68,22 +64,16 @@ def test_Product(backend, L, M, N, K, density):
     # forward
     x = b.rand_array((N,K))
     y = b.rand_array((L,K))
-    A.eval(y, x)
-
-    x_h = x.to_host()
-    y_act = y.to_host()
-    y_exp = A0_h @ (A1_h @ x_h)
-    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+    y_exp = beta * y.to_host() + alpha * A0_h @ (A1_h @ x.to_host())
+    A.eval(y, x, alpha=alpha, beta=beta)
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # adjoint
     x = b.rand_array((L,K))
     y = b.rand_array((N,K))
-    A.H.eval(y, x)
-
-    x_h = x.to_host()
-    y_act = y.to_host()
-    y_exp = A1_h.H @ (A0_h.H @ x_h)
-    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+    y_exp = beta * y.to_host() + alpha * A1_h.H @ (A0_h.H @ x.to_host())
+    A.H.eval(y, x, alpha=alpha, beta=beta)
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # shape
     assert A.shape == (L,N)
@@ -93,9 +83,9 @@ def test_Product(backend, L, M, N, K, density):
     assert A.dtype == np.dtype('complex64')
 
 
-@pytest.mark.parametrize("backend,stack,M,N,K,density",
-    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
-def test_VStack(backend, stack, M, N, K, density):
+@pytest.mark.parametrize("backend,stack,M,N,K,density,alpha,beta",
+    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,1,0.5] ))
+def test_VStack(backend, stack, M, N, K, density, alpha, beta):
     b = backend()
     mats_h = [slo.util.randM(M,N,density) for i in range(stack)]
     A_h = spp.vstack(mats_h)
@@ -106,17 +96,15 @@ def test_VStack(backend, stack, M, N, K, density):
     # forward
     x = b.rand_array((A.shape[1],K))
     y = b.rand_array((A.shape[0],K))
-    A.eval(y, x)
-
-    y_exp = A_h @ x.to_host()
+    y_exp = beta * y.to_host() + alpha * A_h @ x.to_host()
+    A.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # adjoint
     x = b.rand_array((A.shape[0],K))
     y = b.rand_array((A.shape[1],K))
-    A.H.eval(y, x)
-
-    y_exp = A_h.H @ x.to_host()
+    y_exp = beta * y.to_host() + alpha * A_h.H @ x.to_host()
+    A.H.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # shape
@@ -127,9 +115,9 @@ def test_VStack(backend, stack, M, N, K, density):
     assert A.dtype == np.dtype('complex64')
 
 
-@pytest.mark.parametrize("backend,stack,M,N,K,density",
-    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
-def test_HStack(backend, stack, M, N, K, density):
+@pytest.mark.parametrize("backend,stack,M,N,K,density,alpha,beta",
+    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
+def test_HStack(backend, stack, M, N, K, density, alpha, beta):
     b = backend()
     mats_h = [slo.util.randM(M,N,density) for i in range(stack)]
     A_h = spp.hstack(mats_h)
@@ -140,17 +128,15 @@ def test_HStack(backend, stack, M, N, K, density):
     # forward
     x = b.rand_array((A.shape[1],K))
     y = b.rand_array((A.shape[0],K))
-    A.eval(y, x)
-
-    y_exp = A_h @ x.to_host()
+    y_exp = beta * y.to_host() + alpha * A_h @ x.to_host()
+    A.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # adjoint
     x = b.rand_array((A.shape[0],K))
     y = b.rand_array((A.shape[1],K))
-    A.H.eval(y, x)
-
-    y_exp = A_h.H @ x.to_host()
+    y_exp = beta * y.to_host() + alpha * A_h.H @ x.to_host()
+    A.H.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # shape
@@ -161,9 +147,9 @@ def test_HStack(backend, stack, M, N, K, density):
     assert A.dtype == np.dtype('complex64')
 
 
-@pytest.mark.parametrize("backend,stack,M,N,K,density",
-    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
-def test_BlockDiag(backend, stack, M, N, K, density):
+@pytest.mark.parametrize("backend,stack,M,N,K,density,alpha,beta",
+    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
+def test_BlockDiag(backend, stack, M, N, K, density, alpha, beta):
     b = backend()
     mats_h = [slo.util.randM(M,N,density) for i in range(stack)]
     A_h = spp.block_diag(mats_h)
@@ -174,17 +160,15 @@ def test_BlockDiag(backend, stack, M, N, K, density):
     # forward
     x = b.rand_array((A.shape[1],K))
     y = b.rand_array((A.shape[0],K))
-    A.eval(y, x)
-
-    y_exp = A_h @ x.to_host()
+    y_exp = beta * y.to_host() + alpha * A_h @ x.to_host()
+    A.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # adjoint
     x = b.rand_array((A.shape[0],K))
     y = b.rand_array((A.shape[1],K))
-    A.H.eval(y, x)
-
-    y_exp = A_h.H @ x.to_host()
+    y_exp = beta * y.to_host() + alpha * A_h.H @ x.to_host()
+    A.H.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # shape
@@ -195,9 +179,9 @@ def test_BlockDiag(backend, stack, M, N, K, density):
     assert A.dtype == np.dtype('complex64')
 
 
-@pytest.mark.parametrize("backend,stack,M,N,K,density",
-    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1] ))
-def test_KronI(backend, stack, M, N, K, density):
+@pytest.mark.parametrize("backend,stack,M,N,K,density,alpha,beta",
+    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
+def test_KronI(backend, stack, M, N, K, density, alpha, beta):
     b = backend()
     mat_h = slo.util.randM(M,N,density)
     A_h = spp.kron( spp.eye(stack), mat_h )
@@ -208,18 +192,15 @@ def test_KronI(backend, stack, M, N, K, density):
     # forward
     x = b.rand_array((A.shape[1],K))
     y = b.rand_array((A.shape[0],K))
-    A.eval(y, x)
-
-    y_exp = A_h @ x.to_host()
-    y_act = y.to_host()
-    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+    y_exp = beta * y.to_host() + alpha * A_h @ x.to_host()
+    A.eval(y, x, alpha=alpha, beta=beta)
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # adjoint
     x = b.rand_array((A.shape[0],K))
     y = b.rand_array((A.shape[1],K))
-    A.H.eval(y, x)
-
-    y_exp = A_h.H @ x.to_host()
+    y_exp = beta * y.to_host() + alpha * A_h.H @ x.to_host()
+    A.H.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # shape
@@ -228,32 +209,6 @@ def test_KronI(backend, stack, M, N, K, density):
 
     # dtype
     assert A.dtype == np.dtype('complex64')
-
-
-@pytest.mark.parametrize("backend,M,N,K,density,alpha,beta",
-    product( BACKENDS, [22], [23], [1,8], [0.5,1], [-2,0,0.5,1], [-2,0,0.5,1]))
-def test_SpMatrix_alpha_beta(backend, M, N, K, density, alpha, beta):
-    b = backend()
-    A_h = slo.util.randM(M, N, density)
-    A = b.SpMatrix(A_h)
-
-    # forward
-    x = b.rand_array((N,K)); x_h = x.to_host().copy()
-    y = b.rand_array((M,K)); y_h = y.to_host().copy()
-    A.eval(y, x, alpha=alpha, beta=beta)
-
-    y_exp = alpha*A_h*x_h + beta*y_h
-    y_act = y.to_host().copy()
-    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
-
-    # adjoint
-    x = b.rand_array((M,K)); x_h = x.to_host().copy()
-    y = b.rand_array((N,K)); y_h = y.to_host().copy()
-    A.H.eval(y, x, alpha=alpha, beta=beta)
-
-    y_exp = alpha*A_h.H*x_h + beta*y_h
-    y_act = y.to_host().copy()
-    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
 
 
 @pytest.mark.parametrize("backend,M,N,K,B",
@@ -441,9 +396,9 @@ def test_nested_kroni(backend, batch, M, N, c1, c2):
     np.testing.assert_allclose( u_act, u_exp, rtol=1e-6 )
 
 
-@pytest.mark.parametrize("backend,M,N,K,forward",
-    product( BACKENDS, [23,24,45], [45,24,23], [1,8,9,17], [True,False] ))
-def test_DenseMatrix(backend, M, N, K, forward):
+@pytest.mark.parametrize("backend,M,N,K,forward,alpha,beta",
+    product( BACKENDS, [23,24,45], [45,24,23], [1,8,9,17], [True,False], [0,.5,1], [0,.5,1] ))
+def test_DenseMatrix(backend, M, N, K, forward, alpha, beta):
     b = backend()
     A_h = slo.util.rand64c(M,N)
     A = b.DenseMatrix(A_h)
@@ -451,13 +406,12 @@ def test_DenseMatrix(backend, M, N, K, forward):
     if forward:
         x = b.rand_array((N,K))
         y = b.rand_array((M,K))
-        y_exp = A_h.dot(x.to_host())
-        A.eval(y, x)
+        y_exp = beta * y.to_host() + alpha * A_h.dot(x.to_host())
+        A.eval(y, x, alpha=alpha, beta=beta)
     else:
         x = b.rand_array((M,K))
         y = b.rand_array((N,K))
-        y_exp = np.conj(A_h.T).dot(x.to_host())
-        A.H.eval(y, x)
+        y_exp = beta * y.to_host() + alpha * np.conj(A_h.T).dot(x.to_host())
+        A.H.eval(y, x, alpha=alpha, beta=beta)
 
-    y_act = y.to_host()
-    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
