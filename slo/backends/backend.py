@@ -248,8 +248,8 @@ class Backend(object):
     def VStack(self, Ms, **kwargs):
         return op.VStack(self, *Ms, **kwargs)
 
-    def HStack(self, Ms, **kwargs):
-        return op.VStack(self, *[M.H for M in Ms], **kwargs).H
+    def HStack (self, Ms, **kwargs):
+        return op.HStack(self, *Ms, **kwargs)
 
     def UnscaledFFT(self, shape, dtype, **kwargs):
         """ A := FFT{ . } """
