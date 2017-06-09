@@ -16,7 +16,7 @@ class Backend(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, device_id=0):
-        pass
+        profile._backend = self
 
     class dndarray(object):
         """
@@ -195,6 +195,9 @@ class Backend(object):
 
     def get_max_threads(self):
         return 1
+
+    def barrier(self):
+        pass
 
     def mem_usage(self):
         nbytes = 0

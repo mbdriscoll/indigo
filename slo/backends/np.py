@@ -8,6 +8,9 @@ from slo.backends.backend import Backend
 
 class NumpyBackend(Backend):
 
+    def __init__(self, device_id=0):
+        super(NumpyBackend, self).__init__()
+
     # -----------------------------------------------------------------------
     # Arrays
     # -----------------------------------------------------------------------

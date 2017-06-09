@@ -33,6 +33,8 @@ else:
 class MklBackend(Backend):
 
     def __init__(self, device_id=0):
+        super(MklBackend, self).__init__()
+
         self._fft_descs = dict()
 
     def wrap(fn):
