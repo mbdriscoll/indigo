@@ -48,14 +48,23 @@ class profile(object):
         data.update(self.extra)
         data.update(self._kwargs)
 
-        if 'nflops' in self._kwargs:
+        if 'nflops' in data:
             data['gflop_rate'] = data['nflops'] / data['duration'] * 1e-9
+            del data['nflops']
 
-        if 'nbytes' in self._kwargs:
+        if 'nbytes' in data:
             data['membw_rate'] = data['nbytes'] / data['duration'] * 1e-9
+            del data['nbytes']
 
         kvs = sorted(data.items(), key=lambda kv: kv[0])
-        msg = "PROFILE(%s)" % ", ".join("%s=%s" % (k,repr(v)) for k,v in kvs)
+
+        def fmt(k, v):
+            if isinstance(v, float):
+                return k, "%2.5g" % v
+            else:
+                return k, repr(v)
+
+        msg = "PROFILE(%s)" % ", ".join("%s=%s" % fmt(*kv) for kv in kvs)
         log.debug(msg)
 
 

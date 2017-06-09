@@ -153,11 +153,20 @@ class SpMatrix(Operator):
         M_d = self._get_or_create_device_matrix()
         nbytes = M_d.nbytes + x.nbytes + (y.nbytes * (1 if beta == 0 else 2))
         nthreads = self._backend.get_max_threads()
-        with profile("csrmm", nbytes=nbytes, nthreads=nthreads):
+
+        if 'interp' in self._name:
+            purpose = 'grid ' + ('forward' if forward else 'adjoint')
+        elif 'map' in self._name:
+            purpose = 'maps ' + ('forward' if forward else 'adjoint')
+        else:
+            purpose = '?'
+
+        with profile("csrmm", nbytes=nbytes, nthreads=nthreads, purpose=purpose):
             if forward:
                 M_d.forward(y, x, alpha=alpha, beta=beta)
             else:
                 M_d.adjoint(y, x, alpha=alpha, beta=beta)
+            self._backend.barrier()
 
 
 class DenseMatrix(Operator):
@@ -225,6 +234,7 @@ class UnscaledFFT(Operator):
                 self._backend.fftn(Y, X)
             else:
                 self._backend.ifftn(Y, X)
+            self._backend.barrier()
 
     def _mem_usage(self):
         return 0
