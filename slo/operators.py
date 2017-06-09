@@ -291,18 +291,13 @@ class VStack(CompositeOperator):
             h_offset += h
 
     def _eval_adjoint(self, y, x, alpha=1, beta=0):
-        assert beta in (0,1)
-        if beta == 0:
-            y._zero()
+        self._backend.scale(y, beta)
         w_offset = 0
-        accum = self._backend.zero_array( y.shape, y.dtype ) # TODO cache dynamic malloc
         for C in self._children:
             w = C.shape[0]
             slc = slice( w_offset, w_offset+w )
-            C.eval( accum, x[slc,:], alpha=alpha, beta=1, forward=False)
+            C.eval( y, x[slc,:], alpha=alpha, beta=1, forward=False)
             w_offset += w
-        y.copy(accum)
-        del accum
 
     def _adopt(self, children):
         widths = [child.shape[1] for child in children]
