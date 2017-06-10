@@ -26,6 +26,8 @@ class c_complex(c_float * 2):
 class CudaBackend(Backend):
 
     def __init__(self, device_id=0):
+        super(CudaBackend, self).__init__()
+
         self._fft_plans = dict()
 
         self._cublas_handle = self.cublasHandle_t(self)
@@ -108,6 +110,9 @@ class CudaBackend(Backend):
     cudaMemcpy.DeviceToHost   =   2
     cudaMemcpy.DeviceToDevice =   3
     cudaMemcpy.Default        =   4
+
+    def barrier(self):
+        self.cudaDeviceSynchronize()
 
     # -----------------------------------------------------------------------
     # Arrays

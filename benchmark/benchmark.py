@@ -40,15 +40,15 @@ def benchmark_fft(backend, args):
     y_d = backend.copy_array(y)
 
     timer = Timer()
-    for trial in range(args.trials):
-        backend.barrier()
-        with timer:
+    backend.barrier()
+    with timer:
+        for trial in range(args.trials):
             F.eval(y_d, x_d)
-            backend.barrier()
+        backend.barrier()
 
     XYZ = np.prod(x.shape[:3])
-    nsec = timer.median
-    nflops = 5 * np.prod(XYZ) * np.log2(XYZ)
+    nsec = timer.median / args.trials
+    nflops = 5 * XYZ * np.log2(XYZ)
     nbytes = 4 * x.nbytes
     roofline = args.stream*1e9 * (nflops / nbytes)
     frac = (nflops / nsec) / roofline * 100
@@ -106,8 +106,9 @@ def main():
     args = parser.parse_args()
 
     from slo.backends.mkl import MklBackend
+    from slo.backends.cuda import CudaBackend
 
-    Backends = [MklBackend]
+    Backends = [MklBackend,CudaBackend]
 
     for Backend in Backends:
         backend = Backend()

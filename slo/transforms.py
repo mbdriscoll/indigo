@@ -197,6 +197,7 @@ class RealizeMatrices(Transform):
         left, right = node._children
         if isinstance(left, SpMatrix) and isinstance(right, SpMatrix):
             name = "{}*{}".format(left._name, right._name)
+            log.debug('computing %s * %s', left._name, right._name)
             m = left._matrix @ right._matrix
             return SpMatrix( node._backend, m, name=name )
         else:
@@ -208,6 +209,7 @@ class RealizeMatrices(Transform):
         if all(isinstance(c, SpMatrix) for c in node._children):
             name = "{}+".format(node._children[0]._name)
             dtype = node._children[0].dtype
+            log.debug('stacking %s', ', '.join(c._name for c in node._children))
             m = spp.vstack( [c._matrix for c in node._children], dtype=dtype )
             return SpMatrix( node._backend, m, name=name )
         else:
