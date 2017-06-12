@@ -227,15 +227,15 @@ class UnscaledFFT(Operator):
         batch = X.shape[3]
         bs = self._batch_size if self._batch_size != None else batch
         for b in range(0, batch, bs):
-            u,v,w,batch = X.shape
-            nflops = batch * 5 * u*v*w * np.log2(u*v*w)
-            nbytes = X.nbytes * 2 + Y.nbytes * 2
-            nthreads = self._backend.get_max_threads()
-
             batch_max = min(b + bs, batch)
             slc = slice(b, batch_max)
 
-            with profile("fft", nflops=nflops, nbytes=nbytes, shape=X.shape, nthreads=nthreads):
+            u,v,w,batch = X.shape
+            nflops = (batch_max - b) * 5 * u*v*w * np.log2(u*v*w)
+            nbytes = X[:,:,:,slc].nbytes * 2 + Y[:,:,:,slc].nbytes * 2
+            nthreads = self._backend.get_max_threads()
+
+            with profile("fft", nflops=nflops, nbytes=nbytes, shape=X[:,:,:,slc], nthreads=nthreads):
                 if forward:
                     self._backend.fftn(Y[:,:,:,slc], X[:,:,:,slc])
                 else:
@@ -404,7 +404,7 @@ class Product(CompositeOperator):
         batch = x.shape[1]
         tmp = self._get_or_create_intermediate( batch, x.dtype )
         L, R = self._children
-        bs = self._batch_size if self._batch_size != None else batch
+        bs = self._batch_size or batch
         for b in range(0, batch, bs):
             batch_max = min(b + bs, batch)
             slc = slice(b, batch_max)
