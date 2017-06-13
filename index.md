@@ -1,4 +1,4 @@
-SLO implements a collection of routines for constructing and evaluating hig-performance linear operators on multicore and accelerator platforms.
+SLO implements a collection of routines for constructing and evaluating high-performance linear operators on multicore and accelerator platforms.
 
 ## Installation
 1. Install Anaconda or Miniconda.
