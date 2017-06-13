@@ -10,8 +10,9 @@ from slo.util import profile
 log = logging.getLogger(__name__)
 
 class Operator(object):
-    def __init__(self, backend, name=''):
+    def __init__(self, backend, name='', batch=None):
         self._backend = backend
+        self._batch = batch
         self._name = name
 
     def eval(self, y, x, alpha=1, beta=0, forward=True):
@@ -28,10 +29,10 @@ class Operator(object):
             raise ValueError("Dtype mismatch: attemping {} = {} * {}".format(
                 y.dtype, self.dtype, x.dtype))
 
-        batch_size = 1
-        for b in range(0,x.shape[1],batch_size):
-          x_slc = x[:, b*batch_size : min(x.shape[1], (b+1)*batch_size) ]
-          y_slc = y[:, b*batch_size : min(x.shape[1], (b+1)*batch_size) ]
+        batch_size = self._batch or x.shape[1]
+        for b in range(0, x.shape[1], batch_size):
+          x_slc = x[ :, b*batch_size : (b+1)*batch_size ]
+          y_slc = y[ :, b*batch_size : (b+1)*batch_size ]
           self._eval(y_slc, x_slc, alpha=alpha, beta=beta, forward=forward)
 
     @property
@@ -208,12 +209,10 @@ class DenseMatrix(Operator):
 
 
 class UnscaledFFT(Operator):
-    def __init__(self, backend, ft_shape, dtype=np.dtype('complex64'), forward=True, batch_size=1, **kwargs):
+    def __init__(self, backend, ft_shape, dtype=np.dtype('complex64'), forward=True, **kwargs):
         super().__init__(backend, **kwargs)
         self._ft_shape = ft_shape
-        self._default_batch = 1
         self._dtype = dtype
-        self._batch_size = batch_size
 
     @property
     def shape(self):
@@ -233,7 +232,7 @@ class UnscaledFFT(Operator):
         nflops = batch * 5 * u*v*w * np.log2(u*v*w)
         nbytes = X.nbytes * 2 + Y.nbytes * 2
 
-        with profile("fft", nflops=nflops, nbytes=nbytes, shape=X.shape):
+        with profile("fft", nflops=nflops, shape=X.shape):
             if forward:
                 self._backend.fftn(Y, X)
             else:
@@ -362,10 +361,9 @@ class HStack(CompositeOperator):
         super()._adopt(children)
 
 class Product(CompositeOperator):
-    def __init__(self, *args, batch_size=1, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._intermediate = None
-        self._batch_size = batch_size
         self._name = "{}*{}".format(self.left._name, self.right._name)
 
     @property
@@ -389,23 +387,14 @@ class Product(CompositeOperator):
                 L.shape, R.shape, L._name, R._name))
         super()._adopt(children)
 
-    def _get_or_create_intermediate(self, batch, dtype):
-        if self._intermediate is None:
-            batch_size = batch #min(self._batch_size, batch) if self._batch_size != None else batch
-            intermediate_shape = (self._children[0].shape[1], batch_size)
-            arr_name = "%s intermediate" % self._name
-            arr = self._backend.zero_array( intermediate_shape, dtype, name=arr_name )
-            self._intermediate = arr
-        return self._intermediate
-
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         L, R = self._children
         if forward:
-            tmp = self._backend.dndarray( self._backend, (R.shape[0],x.shape[1]), dtype=x.dtype)
+            tmp = self._backend.zero_array((R.shape[0],x.shape[1]), dtype=x.dtype)
             R.eval(tmp, x, alpha=alpha, beta=0, forward=True)
             L.eval(y, tmp, alpha=1,  beta=beta, forward=True)
         else:
-            tmp = self._backend.dndarray( self._backend, (L.shape[1],x.shape[1]), dtype=x.dtype)
+            tmp = self._backend.zero_array((L.shape[1],x.shape[1]), dtype=x.dtype)
             L.eval(tmp, x, alpha=alpha, beta=0, forward=False)
             R.eval(y, tmp, alpha=1,  beta=beta, forward=False)
         del tmp

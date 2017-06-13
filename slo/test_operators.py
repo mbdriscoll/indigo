@@ -60,20 +60,19 @@ def test_Product(backend, L, M, N, K, density, alpha, beta, batch_size):
     A0 = b.SpMatrix(A0_h, name='A0')
     A1 = b.SpMatrix(A1_h, name='A1')
     A = A0 * A1
-    A._batch_size = batch_size
 
     # forward
     x = b.rand_array((N,K))
     y = b.rand_array((L,K))
     y_exp = beta * y.to_host() + alpha * A0_h @ (A1_h @ x.to_host())
-    A.eval(y, x, alpha=alpha, beta=beta)
+    A.eval(y, x, alpha=alpha, beta=beta, batch=batch_size)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # adjoint
     x = b.rand_array((L,K))
     y = b.rand_array((N,K))
     y_exp = beta * y.to_host() + alpha * A1_h.H @ (A0_h.H @ x.to_host())
-    A.H.eval(y, x, alpha=alpha, beta=beta)
+    A.H.eval(y, x, alpha=alpha, beta=beta, batch=batch_size)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # shape
@@ -223,9 +222,9 @@ def test_UnscaledFFT(backend, M, N, K, B, batch_size ):
     y = b.rand_array( (M*N*K, B) )
     x_h = x.to_host().reshape( (M,N,K,B), order='F' )
 
-    A = b.UnscaledFFT( (M,N,K), dtype=x.dtype, batch_size=batch_size )
+    A = b.UnscaledFFT( (M,N,K), dtype=x.dtype )
 
-    A.eval(y, x)
+    A.eval(y, x, batch=batch_size)
 
     y_exp = np.fft.fftn( x_h, axes=(0,1,2) )
     y_act = y.to_host().reshape( (M,N,K,B), order='F' )
@@ -236,7 +235,7 @@ def test_UnscaledFFT(backend, M, N, K, B, batch_size ):
     y = b.rand_array( (M*N*K, B) )
     x_h = x.to_host().reshape( (M,N,K,B), order='F' )
 
-    A.H.eval(y, x)
+    A.H.eval(y, x, batch=batch_size)
 
     y_exp = np.fft.ifftn( x_h, axes=(0,1,2) ) * (M*N*K)
     y_act = y.to_host().reshape( (M,N,K,B), order='F' )
