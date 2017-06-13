@@ -31,8 +31,8 @@ class Operator(object):
 
         batch_size = self._batch or x.shape[1]
         for b in range(0, x.shape[1], batch_size):
-          x_slc = x[ :, b*batch_size : (b+1)*batch_size ]
-          y_slc = y[ :, b*batch_size : (b+1)*batch_size ]
+          x_slc = x[:,b:b+batch_size]
+          y_slc = y[:,b:b+batch_size]
           self._eval(y_slc, x_slc, alpha=alpha, beta=beta, forward=forward)
 
     @property
