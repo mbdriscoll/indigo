@@ -183,8 +183,12 @@ class Backend(object):
         return self.dndarray.to_device(self, arr, name=name)
 
     def zero_array(self, shape, dtype, name=''):
-        d_arr = self.dndarray(self, shape, dtype, name=name)
+        d_arr = self.empty_array(shape, dtype, name=name)
         d_arr._zero()
+        return d_arr
+
+    def empty_array(self, shape, dtype, name=''):
+        d_arr = self.dndarray(self, shape, dtype, name=name)
         return d_arr
 
     def rand_array(self, shape, dtype=np.dtype('complex64'), name=''):

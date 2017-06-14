@@ -51,16 +51,15 @@ def test_SpMatrix(backend, M, N, K, density, alpha, beta):
     assert A.dtype == np.dtype('complex64')
 
 
-@pytest.mark.parametrize("backend,L,M,N,K,density,alpha,beta,batch_size",
-    product( BACKENDS, [3,4], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1], [1, 3, 4, None] ))
-def test_Product(backend, L, M, N, K, density, alpha, beta, batch_size):
+@pytest.mark.parametrize("backend,L,M,N,K,density,alpha,beta",
+    product( BACKENDS, [3,4], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
+def test_Product(backend, L, M, N, K, density, alpha, beta):
     b = backend()
     A0_h = slo.util.randM(L, M, density)
     A1_h = slo.util.randM(M, N, density)
     A0 = b.SpMatrix(A0_h, name='A0')
     A1 = b.SpMatrix(A1_h, name='A1')
     A = A0 * A1
-    A._batch_size = batch_size
 
     # forward
     x = b.rand_array((N,K))
@@ -212,10 +211,10 @@ def test_KronI(backend, stack, M, N, K, density, alpha, beta):
     assert A.dtype == np.dtype('complex64')
 
 
-@pytest.mark.parametrize("backend,M,N,K,B,batch_size",
-    product( BACKENDS, [22,23,24], [22,23,24], [22,23,24], [1,2,3,8], [1, 3, 4, None])
+@pytest.mark.parametrize("backend,M,N,K,B",
+    product( BACKENDS, [22,23,24], [22,23,24], [22,23,24], [1,2,3,8] )
 )
-def test_UnscaledFFT(backend, M, N, K, B, batch_size ):
+def test_UnscaledFFT(backend, M, N, K, B ):
     b = backend()
 
     # forward
@@ -223,7 +222,7 @@ def test_UnscaledFFT(backend, M, N, K, B, batch_size ):
     y = b.rand_array( (M*N*K, B) )
     x_h = x.to_host().reshape( (M,N,K,B), order='F' )
 
-    A = b.UnscaledFFT( (M,N,K), dtype=x.dtype, batch_size=batch_size )
+    A = b.UnscaledFFT( (M,N,K), dtype=x.dtype )
 
     A.eval(y, x)
 
@@ -415,4 +414,27 @@ def test_DenseMatrix(backend, M, N, K, forward, alpha, beta):
         y_exp = beta * y.to_host() + alpha * np.conj(A_h.T).dot(x.to_host())
         A.H.eval(y, x, alpha=alpha, beta=beta)
 
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
+
+
+@pytest.mark.parametrize("backend,M,N,K,density,alpha,beta,batch",
+    product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1],
+             [None,1,2,10] ))
+def test_batch(backend, M, N, K, density, alpha, beta, batch):
+    b = backend()
+    A_h = slo.util.randM(M, N, density)
+    A = b.SpMatrix(A_h, batch=batch)
+
+    # forward
+    x = b.rand_array((N,K))
+    y = b.rand_array((M,K))
+    y_exp = beta * y.to_host() + alpha * A_h * x.to_host()
+    A.eval(y, x, alpha=alpha, beta=beta)
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
+
+    # adjoint
+    x = b.rand_array((M,K))
+    y = b.rand_array((N,K))
+    y_exp = beta * y.to_host() + alpha * A_h.H * x.to_host()
+    A.H.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
