@@ -156,7 +156,7 @@ class CudaBackend(Backend):
                 if b < 0: b = n+b # remove neg begining indices
                 if e < 0: e = n+e # remove neg ending indices
                 if e < b: e = b   # disallow negative sizes
- 		if e > n: e = n   # fix over-slices
+                if e > n: e = n   # fix over-slices
                 start.append(b)
                 shape.append(e-b)
             idx = np.ravel_multi_index(start, self.shape, order='F')
