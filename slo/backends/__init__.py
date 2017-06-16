@@ -24,3 +24,16 @@ def available_backends():
         log.warn("couldn't find CUDA backend")
 
     return backends
+
+def get_backend(name):
+    if name == 'mkl':
+        from slo.backends.mkl  import MklBackend
+        return MklBackend
+    elif name == 'cuda':
+        from slo.backends.cuda import CudaBackend
+        return CudaBackend
+    elif name == 'numpy':
+        from slo.backends.np   import NumpyBackend
+        return NumpyBackend
+    else:
+        log.error("unrecognized backend: %s", name)
