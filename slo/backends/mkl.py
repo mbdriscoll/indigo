@@ -10,31 +10,14 @@ from .backend import Backend
 log = logging.getLogger(__name__)
 
 # Find MKL library
-MKLROOT = os.environ.get("MKLROOT", None)
-if MKLROOT == None:
-    MKLROOT = os.environ.get("CONDA_PREFIX", '/opt/intel/mkl')
-
-for libpath in [
-    'lib/intel64/libmkl_rt.so', # linux
-    'lib/libmkl_rt.dylib',      # macos
-    'lib/libmkl_rt.so',         # anaconda
-]:
-    libmkl_rt_path = os.path.join(MKLROOT, libpath)
-    if os.path.exists( libmkl_rt_path ):
-        log.debug("using MKL library at path <%s>." % libmkl_rt_path)
-        libmkl_rt = cdll.LoadLibrary( libmkl_rt_path )
-        break
-else:
-    log.critical("Could not locate MKL at path <%s>.", MKLROOT)
-    log.critical("Try setting MKLROOT environment variable.")
-    sys.exit(1)
-
+dll_ext = '.dylib' if sys.platform == 'darwin' else '.so'
+libmkl_rt = cdll.LoadLibrary('libmkl_rt' + dll_ext)
 
 class MklBackend(Backend):
 
     def __init__(self, device_id=0):
         super(MklBackend, self).__init__()
-
+        log.info('mkl_get_version() reports: %s', self.get_version())
         self._fft_descs = dict()
 
     def wrap(fn):
@@ -97,6 +80,15 @@ class MklBackend(Backend):
 
     def get_max_threads(self):
         return self.mkl_get_max_threads()
+
+    @wrap
+    def mkl_get_version_string( buf : c_char_p, length : c_int ) -> c_void_p:
+        pass
+
+    def get_version(self):
+        buf = create_string_buffer(128)
+        self.mkl_get_version_string(buf, len(buf))
+        return buf.value.decode('ascii')
 
     # -----------------------------------------------------------------------
     # BLAS Routines
