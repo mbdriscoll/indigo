@@ -371,6 +371,19 @@ class CudaBackend(Backend):
         pass
 
     @wrap(cufft)
+    def cufftGetSizeMany(
+        plan     : cufftHandle_t,
+        rank     : c_int,
+        n        : POINTER(c_int*3),
+        inembed  : POINTER(c_int), istride: c_int, idist: c_int,
+        onembed  : POINTER(c_int), ostride: c_int, odist: c_int,
+        typ      : cufftType_t,
+        batch    : c_int,
+        workSize : POINTER(c_size_t)
+    ) -> cufftResult_t:
+        pass
+
+    @wrap(cufft)
     def cufftCreate(
         plan : POINTER(cufftHandle_t),
     ) -> cufftResult_t:
@@ -393,6 +406,18 @@ class CudaBackend(Backend):
                 None, 0, 0, None, 0, 0, CudaBackend.CUFFT_C2C, batch)
             self._fft_plans[key] = plan
         return self._fft_plans[key]
+
+    def _fft_workspace_size(self, x_shape):
+        x_size = np.prod(x_shape)
+        N = x_shape[:3][::-1]
+        dims = (c_int*3)(*N)
+        batch = c_int(x_size // np.prod(N))
+        workSize = c_size_t()
+        plan = CudaBackend.cufftHandle_t(self)
+        self.cufftGetSizeMany(plan, 3, byref(dims),
+            None, 0, 0, None, 0, 0, CudaBackend.CUFFT_C2C, batch,
+            byref(workSize))
+        return workSize.value
 
     def fftn(self, y, x):
         plan = self._get_or_create_plan(x)

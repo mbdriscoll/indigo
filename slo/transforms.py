@@ -240,4 +240,4 @@ class StoreMatricesInAdjointOrder(Transform):
     def visit_SpMatrix(self, node):
         """ SpMatrix => Adjoint(SpMatrix.H) """
         M = node._matrix
-        return SpMatrix( node._backend, M.getH(), name=node._name ).H
+        return SpMatrix( node._backend, spp.csr_matrix(M.getH(), copy=True), name=node._name ).H
