@@ -80,6 +80,10 @@ class Operator(object):
         from slo.transforms import Optimize
         return Optimize().visit(self)
 
+    def memusage(self, x_shape, x_dtype):
+        from slo.analyses import Memusage
+        return Memusage().estimate_nbytes(self, x_shape, x_dtype)
+
 
 class CompositeOperator(Operator):
     def __init__(self, backend, *children, **kwargs):

@@ -136,10 +136,7 @@ AHy = A.H * ksp
 AHy /= abs(AHy).max()
 x = np.zeros((AHA.shape[1],1), dtype=ksp.dtype, order='F')
 
-from slo.util import Memusage
-
-m = Memusage()
-nbytes = m.estimate_nbytes(AHA, x.shape, x.dtype)
+nbytes = AHA.memusage(x.shape, x.dtype)
 log.info('Evaluating tree will require %s Mbytes of device memory.' % (sum(nbytes)))
 
 # do reconstruction
