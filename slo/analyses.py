@@ -2,9 +2,11 @@ import logging
 import numpy as np
 import scipy.sparse as spp
 
+from slo.transforms import Visitor
+
 log = logging.getLogger(__name__)
 
-class Memusage(object):
+class Memusage(Visitor):
     """
     Estimates maximum memory needed for evaluating a tree
     during CG.
@@ -20,19 +22,6 @@ class Memusage(object):
         intermediate_nbytes = self.intermediate_nbytes(root, x_shape, x_dtype)
         tmp_nbytes = np.prod(x_shape) * x_dtype.itemsize
         return tuple(nb / 1024 / 1024 for nb in [data_nbytes, intermediate_nbytes, tmp_nbytes*4])
-
-    def visit(self, node):
-        method_name = "visit_%s" % type(node).__name__
-        visitor_method = getattr(self, method_name, None)
-        if visitor_method:
-            visitor_method(node)
-        else:
-            self.generic_visit(node)
-
-    def generic_visit(self, node):
-        if hasattr(node, '_children'):
-            for c in node._children:
-                self.visit(c)
 
     def visit_DenseMatrix(self, node):
         self.dataItems[id(node)] = (node._name, node._matrix.nbytes)
