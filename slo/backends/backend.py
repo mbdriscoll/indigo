@@ -391,6 +391,9 @@ class Backend(object):
         """
         raise NotImplementedError()
 
+    def _fft_workspace_size(self, x_shape):
+        return 0
+
     @abc.abstractmethod
     def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha=1, beta=0, adjoint=False):
         """

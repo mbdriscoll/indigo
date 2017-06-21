@@ -136,6 +136,9 @@ AHy = A.H * ksp
 AHy /= abs(AHy).max()
 x = np.zeros((AHA.shape[1],1), dtype=ksp.dtype, order='F')
 
+nbytes = AHA.memusage(x.shape, x.dtype)
+log.info('Evaluating tree will require %s Mbytes of device memory.' % (sum(nbytes)))
+
 # do reconstruction
 B.cg(AHA, AHy, x, maxiter=args.i)
 
