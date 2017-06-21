@@ -86,8 +86,8 @@ class Operator(object):
 
 
 class CompositeOperator(Operator):
-    def __init__(self, backend, *children, **kwargs):
-        super().__init__(backend, **kwargs)
+    def __init__(self, backend, *children, batch=None, **kwargs):
+        super().__init__(backend, batch=batch, **kwargs)
         self._adopt(children)
 
     @property
@@ -213,8 +213,8 @@ class DenseMatrix(Operator):
 
 
 class UnscaledFFT(Operator):
-    def __init__(self, backend, ft_shape, dtype=np.dtype('complex64'), forward=True, **kwargs):
-        super().__init__(backend, **kwargs)
+    def __init__(self, backend, ft_shape, dtype=np.dtype('complex64'), forward=True, batch=None, **kwargs):
+        super().__init__(backend, batch=batch, **kwargs)
         self._ft_shape = ft_shape
         self._dtype = dtype
 
@@ -366,8 +366,8 @@ class HStack(CompositeOperator):
         super()._adopt(children)
 
 class Product(CompositeOperator):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, batch=None, **kwargs):
+        super().__init__(*args, batch=batch, **kwargs)
         self._intermediate = None
         self._name = "{}*{}".format(self.left._name, self.right._name)
 
