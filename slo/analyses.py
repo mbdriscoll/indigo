@@ -19,7 +19,7 @@ class Memusage(Visitor):
         self.dataCount = 0
         self.visit(root)
         data_nbytes = sum([v[1] for k, v in self.dataItems.items()])
-        intermediate_nbytes = self.intermediate_nbytes(root, x_shape, x_dtype)
+        intermediate_nbytes = IntermediateMemusage().visit(root, x_shape, x_dtype)
         tmp_nbytes = np.prod(x_shape) * x_dtype.itemsize
         return tuple(nb / 1024 / 1024 for nb in [data_nbytes, intermediate_nbytes, tmp_nbytes*4])
 
@@ -36,7 +36,13 @@ class Memusage(Visitor):
         colind = x.nnz * np.dtype('int32').itemsize
         self.dataItems[id(node)] = (node._name, data + rowptr + colind)
 
-    def intermediate_nbytes(self, node, x_shape, x_dtype):
+
+class IntermediateMemusage(object):
+    """
+    Estimates intermediate memory necessary for
+    evaluating a tree.
+    """
+    def visit(self, node, x_shape, x_dtype):
         from slo.operators import Product,UnscaledFFT,KronI
         nbytes = 0
         x_shape = (x_shape[0], min(x_shape[1], node._batch) if node._batch is not None else x_shape[1])
@@ -45,8 +51,8 @@ class Memusage(Visitor):
         elif isinstance(node, Product):
             intermediate_shape = node._intermediate_shape(x_shape)
             nbytes += node._mem_usage(x_shape, x_dtype)
-            max_child = max(self.intermediate_nbytes(node._children[0], intermediate_shape, x_dtype), \
-                            self.intermediate_nbytes(node._children[1], x_shape, x_dtype))
+            max_child = max(self.visit(node._children[0], intermediate_shape, x_dtype), \
+                            self.visit(node._children[1], x_shape, x_dtype))
             return nbytes + max_child
         elif isinstance(node, KronI):
             cb = node._c * x_shape[1]
@@ -54,7 +60,7 @@ class Memusage(Visitor):
         else:
             pass
         if hasattr(node, '_children'):
-            max_child = max([self.intermediate_nbytes(c, x_shape, x_dtype) for c in node._children])
+            max_child = max([self.visit(c, x_shape, x_dtype) for c in node._children])
             nbytes += max_child
         return nbytes
 
