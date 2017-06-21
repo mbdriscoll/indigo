@@ -42,16 +42,10 @@ class Memusage(object):
             self.estimate_spm_nbytes(node._matrix, node=node, name=node._name)
 
     def estimate_spm_nbytes(self, x, node=None, name=''):
-        # Currently, all matrices are actually CSR.
-        x = x.tocsr()
-        if isinstance(x, spp.csr_matrix) or isinstance(x, spp.csc_matrix):
-            self.dataItems[id(node)] = (node._name, x.data.nbytes + x.indptr.nbytes + x.indices.nbytes)
-        elif isinstance(x, spp.coo_matrix):
-            self.dataItems[id(node)] = (node._name, x.col.nbytes + x.row.nbytes + x.data.nbytes)
-        elif isinstance(x, spp.dia_matrix):
-            self.dataItems[id(node)] = (node._name, x.data.nbytes + x.offsets.nbytes)
-        else:
-            log.warn('Matrix type %s unsupported by Memusage' % (type(x)))
+        data = x.nnz * x.dtype.itemsize
+        rowptr = x.shape[0] * np.dtype('int32').itemsize
+        colind = x.nnz * np.dtype('int32').itemsize
+        self.dataItems[id(node)] = (node._name, data + rowptr + colind)
 
     def intermediate_nbytes(self, node, x_shape, x_dtype):
         from slo.operators import Product,UnscaledFFT,KronI
