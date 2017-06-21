@@ -112,8 +112,9 @@ class Memusage(object):
 
     def estimate_nbytes(self, root, x_shape, x_dtype):
         self.dataItems = {}
+        self.dataCount = 0
         self.visit(root)
-        data_nbytes = sum([v for k, v in self.dataItems.items()])
+        data_nbytes = sum([v[1] for k, v in self.dataItems.items()])
         intermediate_nbytes = self.intermediate_nbytes(root, x_shape, x_dtype)
         tmp_nbytes = np.prod(x_shape) * x_dtype.itemsize
         return tuple(nb / 1024 / 1024 for nb in [data_nbytes, intermediate_nbytes, tmp_nbytes*4])
@@ -132,19 +133,21 @@ class Memusage(object):
                 self.visit(c)
 
     def visit_DenseMatrix(self, node):
-        self.dataItems[id(node._matrix)] = node._matrix.nbytes
+        self.dataItems[id(node)] = (node._name, node._matrix.nbytes)
 
     def visit_SpMatrix(self, node):
         if node._matrix is not None:
             self.estimate_spm_nbytes(node._matrix, node=node, name=node._name)
 
     def estimate_spm_nbytes(self, x, node=None, name=''):
+        # Currently, all matrices are actually CSR.
+        x = x.tocsr()
         if isinstance(x, spp.csr_matrix) or isinstance(x, spp.csc_matrix):
-            self.dataItems[id(x)] = x.data.nbytes + x.indptr.nbytes + x.indices.nbytes
+            self.dataItems[id(node)] = (node._name, x.data.nbytes + x.indptr.nbytes + x.indices.nbytes)
         elif isinstance(x, spp.coo_matrix):
-            self.dataItems[id(x)] = x.col.nbytes + x.row.nbytes + x.data.nbytes
+            self.dataItems[id(node)] = (node._name, x.col.nbytes + x.row.nbytes + x.data.nbytes)
         elif isinstance(x, spp.dia_matrix):
-            self.dataItems[id(x)] = x.data.nbytes + x.offsets.nbytes
+            self.dataItems[id(node)] = (node._name, x.data.nbytes + x.offsets.nbytes)
         else:
             log.warn('Matrix type %s unsupported by Memusage' % (type(x)))
 

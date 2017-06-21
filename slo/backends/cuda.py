@@ -28,8 +28,6 @@ class CudaBackend(Backend):
     def __init__(self, device_id=0):
         super(CudaBackend, self).__init__()
 
-        self._fft_plans = dict()
-
         self._cublas_handle = self.cublasHandle_t(self)
         self._cusparse_handle = self.cusparseHandle_t(self)
         self._mat_descr = self.cusparseMatDescr_t(self)
@@ -395,17 +393,18 @@ class CudaBackend(Backend):
     ) -> cufftResult_t:
         pass
 
-    def _get_or_create_plan(self, x):
-        key = (x.shape, x.dtype)
-        if key not in self._fft_plans:
-            N = x.shape[:3][::-1]
-            dims = (c_int*3)(*N)
-            batch = c_int(x.size // np.prod(N))
-            plan = CudaBackend.cufftHandle_t(self)
-            self.cufftPlanMany(byref(plan), 3, byref(dims),
-                None, 0, 0, None, 0, 0, CudaBackend.CUFFT_C2C, batch)
-            self._fft_plans[key] = plan
-        return self._fft_plans[key]
+    def _create_plan(self, x):
+        key = 'fft_plan.' + str(tuple((x.shape, x.dtype)))
+        N = x.shape[:3][::-1]
+        dims = (c_int*3)(*N)
+        batch = c_int(x.size // np.prod(N))
+        plan = CudaBackend.cufftHandle_t(self)
+        self.cufftPlanMany(byref(plan), 3, byref(dims),
+            None, 0, 0, None, 0, 0, CudaBackend.CUFFT_C2C, batch)
+        return plan
+
+    def _delete_plan(self, plan):
+        del plan
 
     def _fft_workspace_size(self, x_shape):
         x_size = np.prod(x_shape)
@@ -420,12 +419,14 @@ class CudaBackend(Backend):
         return workSize.value
 
     def fftn(self, y, x):
-        plan = self._get_or_create_plan(x)
+        plan = self._create_plan(x)
         self.cufftExecC2C(plan, x, y, CudaBackend.CUFFT_FORWARD)
+        self._delete_plan(plan)
 
     def ifftn(self, y, x):
-        plan = self._get_or_create_plan(x)
+        plan = self._create_plan(x)
         self.cufftExecC2C(plan, x, y, CudaBackend.CUFFT_INVERSE)
+        self._delete_plan(plan)
 
     # -----------------------------------------------------------------------
     # Cusparse
