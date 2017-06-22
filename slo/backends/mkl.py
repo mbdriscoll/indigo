@@ -5,13 +5,68 @@ from ctypes import *
 import numpy as np
 from numpy.ctypeslib import ndpointer
 
-from .backend import Backend
+from slo.util import c_complex
+from slo.backends.backend import Backend
 
 log = logging.getLogger(__name__)
 
 # Find MKL library
 dll_ext = '.dylib' if sys.platform == 'darwin' else '.so'
 libmkl_rt = cdll.LoadLibrary('libmkl_rt' + dll_ext)
+
+class sparse_matrix_t(c_void_p):
+    pass
+    
+class sparse_status_t(c_int):
+    SUCCESS = 0
+    NOT_INITIALIZED = 1
+    ALLOC_FAILED = 2
+    INVALID_VALUE = 3
+    EXECUTION_FAILED = 4
+    INTERNAL_ERROR = 5
+    NOT_SUPPORTED = 6
+
+class sparse_index_base_t(c_int):
+    BASE_ZERO = 0
+    BASE_ONE  = 1
+
+class sparse_operation_t(c_int):
+    NON_TRANSPOSE = 10
+    TRANSPOSE = 11
+    CONJUGATE_TRANSPOSE = 12
+
+class sparse_matrix_type_t(c_int):
+    GENERAL = 20
+    SYMMETRIC = 21
+    HERMITIAN = 22
+    TRIANGULAR = 23
+    DIAGONAL = 24
+    BLOCK_TRIANGULAR = 25
+    BLOCK_DIAGONAL = 26
+
+class sparse_fill_mode_t(c_int):
+    NONE = 0
+    LOWER = 40
+    UPPER = 41
+
+class sparse_diag_type_t(c_int):
+    NON_UNIT = 50
+    UNIT = 51
+
+class matrix_descr(Structure):
+    _fields_ = [
+        ("type", sparse_matrix_type_t),
+        ("mode", sparse_fill_mode_t),
+        ("diag", sparse_diag_type_t),
+    ]
+
+    def __init__(self):
+        self.type = sparse_matrix_type_t.GENERAL
+
+class sparse_layout_t(c_int):
+    ROW_MAJOR = 60
+    COLUMN_MAJOR = 61
+
 
 class MklBackend(Backend):
 
@@ -311,51 +366,121 @@ class MklBackend(Backend):
     # CSRMM Routines
     # -----------------------------------------------------------------------
     class csr_matrix(Backend.csr_matrix):
-        _index_base = 1
+        def __init__(self, backend, A, name='mat'):
+            self._name = name
+            self._backend = backend
+            self._mat_h = A = A.tocsr() # store this, since MKL doesn't make a copy
+            self._mat_d = sparse_matrix_t()
+            status = backend.mkl_sparse_c_create_csr( byref(self._mat_d),
+                sparse_index_base_t.BASE_ZERO, A.shape[0], A.shape[1],
+                A.indptr[:-1], A.indptr[1:], A.indices, A.data,
+            )
+            assert status.value == sparse_status_t.SUCCESS, status.value
+
+            # guess how much space MKL will use:
+            self._nbytes = A.indices.nbytes + A.data.nbytes + A.indptr.nbytes
+            self._nnz = A.nnz
+            self._hints = set()
+
+        def __del__(self):
+            self._backend.mkl_sparse_destroy( self._mat_d )
+
+        def forward(self, y, x, alpha=1, beta=0):
+            """ y[:] = A * x """
+            self._eval(y, x, alpha, beta, op=sparse_operation_t.NON_TRANSPOSE)
+                
+        def adjoint(self, y, x, alpha=1, beta=0):
+            """ y[:] = A.H * x """
+            self._eval(y, x, alpha, beta, op=sparse_operation_t.CONJUGATE_TRANSPOSE)
+
+        def _eval(self, y, x, alpha, beta, op):
+            columns = x.shape[1]
+            descr = matrix_descr()
+            self.optimize(op, descr, columns)
+            ldx = x._leading_dims[0]
+            ldy = y._leading_dims[0]
+            status = self._backend.mkl_sparse_c_mm(op,
+                c_complex(alpha),
+                self._mat_d, descr,
+                sparse_layout_t.COLUMN_MAJOR,
+                x._arr, columns, ldx,
+                c_complex(beta),
+                y._arr, ldy
+            )
+            assert status.value == sparse_status_t.SUCCESS, status.value
+
+        def optimize(self, op, descr, columns):
+            key = (op, columns)
+            if key not in self._hints:
+                ncalls = 200
+                trans = (op == sparse_operation_t.CONJUGATE_TRANSPOSE)
+                log.debug('updating hints for %s: trans=%s, columns=%d, ncalls=%d',
+                          self._name, trans, columns, ncalls)
+                self._hints.add(key)
+                # set hint
+                #status = self._backend.mkl_sparse_set_mm_hint( self._mat_d, op,
+                #    descr, sparse_layout_t.COLUMN_MAJOR, columns, ncalls)
+                #assert status.value == sparse_status_t.SUCCESS, status.value
+                # optimize
+                status = self._backend.mkl_sparse_optimize( self._mat_d )
+                assert status.value == sparse_status_t.SUCCESS, status.value
+                
+        @property
+        def nbytes(self):
+            return self._nbytes
+
+        @property
+        def nnz(self):
+            return self._nnz
 
     @wrap
-    def mkl_ccsrmm(
-        transA   : c_char*1,
-        m        : ndpointer(dtype=np.int32,     ndim=0),
-        n        : ndpointer(dtype=np.int32,     ndim=0),
-        k        : ndpointer(dtype=np.int32,     ndim=0),
-        alpha    : ndpointer(dtype=np.dtype('complex64'), ndim=1),
-        matdescA : c_char * 6,
-        val      : dndarray,
-        indx     : dndarray,
-        pntrb    : dndarray,
-        pntre    : dndarray,
-        b        : dndarray,
-        ldb      : ndpointer(dtype=np.int32,     ndim=0),
-        beta     : ndpointer(dtype=np.dtype('complex64'), ndim=1),
-        c        : dndarray,
-        ldc      : ndpointer(dtype=np.int32,     ndim=0),
-    ) -> c_void_p :
+    def mkl_sparse_c_create_csr(
+        A      : POINTER(sparse_matrix_t),
+        indexing : sparse_index_base_t,
+        rows   : c_int,
+        cols   : c_int,
+        rows_s : ndpointer(dtype=np.int32,     ndim=1),
+        rows_e : ndpointer(dtype=np.int32,     ndim=1),
+        colidx : ndpointer(dtype=np.int32,     ndim=1),
+        values : ndpointer(dtype=np.complex64, ndim=1),
+    ) -> sparse_status_t:
+         pass
+
+    @wrap
+    def mkl_sparse_destroy(
+        A : sparse_matrix_t,
+    ) -> sparse_status_t:
         pass
 
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False):
-        transA = create_string_buffer(1)
-        if adjoint:
-            transA[0] = b'C'
-        else:
-            transA[0] = b'N' 
-        ldx = np.array(x._leading_dims[0], dtype=np.int32)
-        ldy = np.array(y._leading_dims[0], dtype=np.int32)
+    @wrap
+    def mkl_sparse_c_mm(
+        oper  : sparse_operation_t,
+        alpha : c_complex,
+        A     : sparse_matrix_t,
+        descr : matrix_descr,
+        layout: sparse_layout_t,
+        x     : ndpointer(dtype=np.complex64),
+        columns: c_int,
+        ldx   : c_int,
+        beta  : c_complex,
+        y     : ndpointer(dtype=np.complex64),
+        ldy   : c_int,
+    ) -> sparse_status_t:
+        pass
 
-        A_ptrb = A_ptr[:-1]
-        A_ptre = A_ptr[1:]
+    @wrap
+    def mkl_sparse_set_mm_hint(
+        A     : sparse_matrix_t,
+        oper  : sparse_operation_t,
+        descr : matrix_descr,
+        layout: sparse_layout_t,
+        dense_matrix_size : c_int,
+        expected_calls : c_int,
+    ) -> sparse_status_t:
+        pass
 
-        m     = np.array(A_shape[0], dtype=np.int32)
-        n     = np.array(x.shape[1], dtype=np.int32)
-        k     = np.array(A_shape[1], dtype=np.int32)
-        alpha = np.array([alpha],    dtype=np.dtype('complex64'))
-        beta  = np.array([beta],     dtype=np.dtype('complex64'))
-
-        descrA = create_string_buffer(6)
-        descrA[0] = b'G'
-        descrA[2] = b'N'
-        descrA[3] = b'F'
-
-        self.mkl_ccsrmm(transA, m, n, k, alpha,
-            descrA, A_vals, A_indx, A_ptrb, A_ptre,
-            x, ldx, beta, y, ldy)
+    @wrap
+    def mkl_sparse_optimize(
+        A : sparse_matrix_t,
+    ) -> sparse_status_t:
+        pass
