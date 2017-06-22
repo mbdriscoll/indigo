@@ -109,7 +109,9 @@ A = A.optimize()
 AHA = A.H * A
 AHA._name = 'SENSE'
 
-log.info('using %d MB of device memory' % (AHA.memusage()/1e6))
+node_mem = AHA.memusage()
+alg_mem = 4 * AHA.shape[1] * ksp.dtype.itemsize
+log.info('using %d MB of device memory' % ((node_mem+alg_mem)/1e6))
 log.info("tree:\n%s", AHA.dump())
 
 # prep data

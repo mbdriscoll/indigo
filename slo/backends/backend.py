@@ -2,6 +2,7 @@ import logging
 import abc, time
 import numpy as np
 import scipy.sparse as spp
+from contextlib import contextmanager
 
 import slo.operators as op
 from slo.util import profile
@@ -215,6 +216,12 @@ class Backend(object):
             if n > 1e6:
                 log.info("  %40s: % 3.0f MB, %20s, %15s", name, n/1e6, shape, dtype)
         return nbytes
+
+    @contextmanager
+    def scratch(self, shape, dtype):
+        mem = self.empty_array(shape, dtype)
+        yield mem
+        del mem
 
     # -----------------------------------------------------------------------
     # Operator Building Interface 
