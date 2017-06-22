@@ -2,9 +2,21 @@ import time
 import logging
 import numpy as np
 import scipy.sparse as spp
-from ctypes import cdll, c_int
+from ctypes import cdll, c_int, c_float, Structure
 
 log = logging.getLogger(__name__)
+
+class c_complex(Structure):
+    ''' ctypes type for complex floating pointer numbers. '''
+    _fields_ = [
+        ('real', c_float),
+        ('imag', c_float),
+    ]
+
+    def __init__(self, a):
+        super().__init__()
+        self.real = a.real
+        self.imag = a.imag
 
 def rand64c(*shape, order='F'):
     """

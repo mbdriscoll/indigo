@@ -7,7 +7,8 @@ from ctypes import *
 import numpy as np
 from numpy.ctypeslib import ndpointer
 
-from .backend import Backend
+from slo.backends..backend import Backend
+from slo.util import c_complex
 
 log = logging.getLogger(__name__)
 
@@ -16,12 +17,6 @@ cusparse = cdll.LoadLibrary("libcusparse.so")
 cufft    = cdll.LoadLibrary("libcufft.so")
 cublas   = cdll.LoadLibrary("libcublas.so")
 nvtx     = cdll.LoadLibrary("libnvToolsExt.so")
-
-class c_complex(c_float * 2):
-    def __init__(self, a):
-        super().__init__()
-        self[0] = a.real
-        self[1] = a.imag
 
 class CudaBackend(Backend):
 
