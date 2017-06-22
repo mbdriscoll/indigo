@@ -1,3 +1,4 @@
+import sys
 import time
 import logging
 import io, copy
@@ -80,14 +81,14 @@ class Operator(object):
         from slo.transforms import Optimize
         return Optimize().visit(self)
 
-    def memusage(self, x_shape, x_dtype):
+    def memusage(self, ncols=1):
         from slo.analyses import Memusage
-        return Memusage().estimate_nbytes(self, x_shape, x_dtype)
+        return Memusage().measure(self, ncols)
 
 
 class CompositeOperator(Operator):
-    def __init__(self, backend, *children, batch=None, **kwargs):
-        super().__init__(backend, batch=batch, **kwargs)
+    def __init__(self, backend, *children, **kwargs):
+        super().__init__(backend, **kwargs)
         self._adopt(children)
 
     @property
@@ -152,6 +153,10 @@ class SpMatrix(Operator):
     def shape(self):
         return self._matrix.shape
 
+    @property
+    def nnz(self):
+        return self._matrix.nnz
+
     def _get_or_create_device_matrix(self):
         if self._matrix_d is None:
             M = self._matrix.tocsr()
@@ -213,8 +218,8 @@ class DenseMatrix(Operator):
 
 
 class UnscaledFFT(Operator):
-    def __init__(self, backend, ft_shape, dtype=np.dtype('complex64'), forward=True, batch=None, **kwargs):
-        super().__init__(backend, batch=batch, **kwargs)
+    def __init__(self, backend, ft_shape, dtype=np.dtype('complex64'), forward=True, **kwargs):
+        super().__init__(backend, **kwargs)
         self._ft_shape = ft_shape
         self._dtype = dtype
 
@@ -242,9 +247,10 @@ class UnscaledFFT(Operator):
             else:
                 self._backend.ifftn(Y, X)
 
-    def _mem_usage(self, x_shape):
-        x_shape = (self._ft_shape + (x_shape[1],))
-        return self._backend._fft_workspace_size(x_shape)
+    def _mem_usage(self, ncols):
+        ncols = min(ncols, self._batch or ncols)
+        ft_shape = self._ft_shape + (ncols,)
+        return self._backend._fft_workspace_size(ft_shape)
 
 
 class KronI(CompositeOperator):
@@ -366,8 +372,8 @@ class HStack(CompositeOperator):
         super()._adopt(children)
 
 class Product(CompositeOperator):
-    def __init__(self, *args, batch=None, **kwargs):
-        super().__init__(*args, batch=batch, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._intermediate = None
         self._name = "{}*{}".format(self.left._name, self.right._name)
 
@@ -404,10 +410,8 @@ class Product(CompositeOperator):
             R.eval(y, tmp, alpha=1,  beta=beta, forward=False)
         del tmp
 
-    def _intermediate_shape(self, x_shape):
-        batch_size = min(x_shape[1], self._batch) if self._batch is not None else x_shape[1]
-        return (self._children[0].shape[1], batch_size)
-
-    def _mem_usage(self, x_shape, x_dtype):
-        return np.prod(self._intermediate_shape(x_shape)) * x_dtype.itemsize
+    def _mem_usage(self, ncols):
+        ncols = min(ncols, self._batch or ncols)
+        nrows = self._children[1].shape[0]
+        return nrows * ncols * self.dtype.itemsize
 

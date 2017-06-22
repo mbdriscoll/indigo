@@ -127,6 +127,7 @@ A._name = 'SENSE1'
 AHA = A.H * A
 AHA._name = 'SENSE'
 
+log.info('using %d MB of device memory' % (AHA.memusage()/1e6))
 log.info("tree:\n%s", AHA.dump())
 
 # prep data
@@ -135,9 +136,6 @@ if NONCART:
 AHy = A.H * ksp
 AHy /= abs(AHy).max()
 x = np.zeros((AHA.shape[1],1), dtype=ksp.dtype, order='F')
-
-nbytes = AHA.memusage(x.shape, x.dtype)
-log.info('Evaluating tree will require %s Mbytes of device memory.' % (sum(nbytes)))
 
 # do reconstruction
 B.cg(AHA, AHy, x, maxiter=args.i)
