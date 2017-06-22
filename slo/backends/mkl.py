@@ -37,15 +37,13 @@ class MklBackend(Backend):
     # -----------------------------------------------------------------------
     class dndarray(Backend.dndarray):
         def _copy_from(self, arr):
-            self._arr.flat[:] = arr.flat
+            np.copyto(self._arr, arr)
 
         def _copy_to(self, arr):
-            arr.flat[:] = self._arr.flat
+            np.copyto(arr, self._arr)
 
         def _copy(self, d_arr):
-            dst = self._arr.reshape(-1, order='F')
-            src = d_arr._arr.reshape(-1, order='F')
-            dst.flat[:] = src.flat
+            np.copyto(self._arr, d_arr._arr)
 
         def _malloc(self, shape, dtype):
             return np.ndarray(shape, dtype, order='F')
