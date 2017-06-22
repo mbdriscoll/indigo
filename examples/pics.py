@@ -118,6 +118,9 @@ AHy = A.H * ksp
 AHy /= abs(AHy).max()
 x = np.zeros((AHA.shape[1],1), dtype=ksp.dtype, order='F')
 
+nbytes = AHA.memusage()
+log.info('using %d MB of device memory' % (nbytes/1e6))
+
 # do reconstruction
 B.cg(AHA, AHy, x, maxiter=args.i)
 

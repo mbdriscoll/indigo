@@ -293,7 +293,7 @@ class MklBackend(Backend):
 
     @wrap
     def DftiCreateDescriptor(
-        desc_handle : DFTI_DESCRIPTOR_HANDLE,
+        desc_handle : POINTER(DFTI_DESCRIPTOR_HANDLE),
         precision   : c_uint,
         domain      : c_uint,
         dimension   : c_long,
@@ -303,7 +303,7 @@ class MklBackend(Backend):
 
     @wrap
     def DftiFreeDescriptor(
-        desc_handle : DFTI_DESCRIPTOR_HANDLE,
+        desc_handle : POINTER(DFTI_DESCRIPTOR_HANDLE),
     ) -> status_t:
         pass
 
