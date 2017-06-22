@@ -394,15 +394,20 @@ class Product(CompositeOperator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         L, R = self._children
+        shape = None
         if forward:
-            tmp = self._backend.zero_array((R.shape[0],x.shape[1]), dtype=x.dtype)
+            # tmp = self._backend.zero_array((R.shape[0],x.shape[1]), dtype=x.dtype)
+            shape = (R.shape[0],x.shape[1])
+            tmp = self._backend.malloc_scratch((R.shape[0],x.shape[1]), dtype=x.dtype)
             R.eval(tmp, x, alpha=alpha, beta=0, forward=True)
             L.eval(y, tmp, alpha=1,  beta=beta, forward=True)
         else:
-            tmp = self._backend.zero_array((L.shape[1],x.shape[1]), dtype=x.dtype)
+            # tmp = self._backend.zero_array((L.shape[1],x.shape[1]), dtype=x.dtype)
+            shape = (L.shape[1],x.shape[1])
+            tmp = self._backend.malloc_scratch((L.shape[1],x.shape[1]), dtype=x.dtype)
             L.eval(tmp, x, alpha=alpha, beta=0, forward=False)
             R.eval(y, tmp, alpha=1,  beta=beta, forward=False)
-        del tmp
+        self._backend.free_scratch(shape)
 
     def _intermediate_shape(self, x_shape):
         batch_size = min(x_shape[1], self._batch) if self._batch is not None else x_shape[1]

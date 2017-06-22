@@ -17,6 +17,8 @@ class Backend(object):
 
     def __init__(self, device_id=0):
         profile._backend = self
+        self._scratch = None
+        self._scratch_size = self._scratch_pos = 0
 
     class dndarray(object):
         """
@@ -178,6 +180,32 @@ class Backend(object):
         def from_param(obj):
             """ convert _arr into ctypes object """
             raise NotImplementedError()
+
+    # Size in *elements*, not bytes
+    def _allocate_scratch_space(self, size, dtype=np.dtype('complex64')):
+        self._scratch = self.empty_array((size,), dtype=dtype, name='scratch_space')
+        self._scratch_size = size
+        self._scratch_pos = 0
+
+    def _free_scratch_space(self):
+        del self._scratch
+
+    def malloc_scratch(self, shape, dtype=np.dtype('complex64')):
+        size = np.prod(shape)
+        if self._scratch_pos + size > self._scratch_size:
+            log.warn('Error: malloc past end of scratch space.')
+        assert(dtype == self._scratch.dtype)
+        slc = slice(self._scratch_pos, self._scratch_pos+size)
+        arr = self._scratch[slc].reshape(shape)
+        arr._zero()
+        self._scratch_pos += size
+        return arr
+
+    def free_scratch(self, shape):
+        size = np.prod(shape)
+        if self._scratch_pos - size < 0:
+            log.warn('Error: free past beginning of scratch space.')
+        self._scratch_pos -= size
 
     def copy_array(self, arr, name=''):
         return self.dndarray.to_device(self, arr, name=name)
