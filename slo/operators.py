@@ -17,6 +17,13 @@ class Operator(object):
 
     def eval(self, y, x, alpha=1, beta=0, forward=True):
         """ y = A * x """
+        allocated = False
+        if self._backend._scratch is None:
+            allocated = True
+            nbytes = sum(self.memusage(x.shape, x.dtype))*1024*1024
+            scratch_size = int(np.ceil((nbytes / np.dtype('complex64').itemsize)))
+            self._backend._allocate_scratch_space(scratch_size, dtype=np.dtype('complex64'))
+
         if x.ndim == 1: x = x.reshape( (x.shape[0], 1) )
         if y.ndim == 1: y = y.reshape( (y.shape[0], 1) )
         M, N = self.shape if forward else tuple(reversed(self.shape))
@@ -34,6 +41,9 @@ class Operator(object):
           x_slc = x[:,b:b+batch_size]
           y_slc = y[:,b:b+batch_size]
           self._eval(y_slc, x_slc, alpha=alpha, beta=beta, forward=forward)
+
+        if allocated:
+            self._backend._free_scratch_space()
 
     @property
     def shape(self):

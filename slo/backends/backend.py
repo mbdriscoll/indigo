@@ -189,6 +189,7 @@ class Backend(object):
 
     def _free_scratch_space(self):
         del self._scratch
+        self._scratch = None
 
     def malloc_scratch(self, shape, dtype=np.dtype('complex64')):
         size = np.prod(shape)
@@ -197,7 +198,6 @@ class Backend(object):
         assert(dtype == self._scratch.dtype)
         slc = slice(self._scratch_pos, self._scratch_pos+size)
         arr = self._scratch[slc].reshape(shape)
-        arr._zero()
         self._scratch_pos += size
         return arr
 

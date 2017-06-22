@@ -132,22 +132,12 @@ log.info("tree:\n%s", AHA.dump())
 # prep data
 if NONCART:
     ksp *= np.sqrt(dcf)
-x = ksp.reshape((A.H.shape[1], -1))
-nbytes = sum(A.H.memusage(x.shape, x.dtype))*1024*1024
-scratch_size = int(np.ceil((nbytes / np.dtype('complex64').itemsize)))
-print('Allocating scratch space of size %s' % (scratch_size))
-B._allocate_scratch_space(scratch_size, dtype=np.dtype('complex64'))
 AHy = A.H * ksp
 AHy /= abs(AHy).max()
-B._free_scratch_space()
 x = np.zeros((AHA.shape[1],1), dtype=ksp.dtype, order='F')
 
 nbytes = AHA.memusage(x.shape, x.dtype)
 log.info('Evaluating tree will require %s Mbytes of device memory.' % (sum(nbytes)))
-
-scratch_size = int(np.ceil((sum(nbytes)*1024*1024) / np.dtype('complex64').itemsize))
-print('Allocating scratch space of size %s' % (scratch_size))
-B._allocate_scratch_space(scratch_size, dtype=np.dtype('complex64'))
 
 # do reconstruction
 B.cg(AHA, AHy, x, maxiter=args.i)
