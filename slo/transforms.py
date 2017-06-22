@@ -9,7 +9,8 @@ from collections import defaultdict
 from slo.operators import (
     CompositeOperator, Product,
     KronI, BlockDiag,
-    VStack, SpMatrix
+    VStack, SpMatrix,
+    Adjoint
 )
 
 log = logging.getLogger(__name__)
@@ -166,6 +167,27 @@ class TreeTransformations(Transform):
             return Product( node._backend, *new_kids, name=node._name )
         else:
             return node
+
+    def visit_Adjoint(self, node):
+        """ Adjoint(CompositeOperator(A, B)) => CompositeOperator(Adjoint(B), Adjoint(A)) """
+        node = self.generic_visit(node)
+        child = node._children[0]
+        if isinstance(child, Product) and self.ask("distribute <%s>" % node._name) and False:
+            return Product(node._backend, \
+                Adjoint(node._backend, child.right, name=child.right._name), \
+                Adjoint(node._backend, child.left, name=child.left._name), \
+                name=node._name)
+        elif isinstance(child, BlockDiag) and self.ask("distribute <%s>" % node._name) and False:
+            return node._backend.BlockDiag([Adjoint(node._backend, c, name=c._name) for c in child._children], name=node._name)
+        elif isinstance(child, KronI) and self.ask("distribute <%s>" % node._name) and False:
+            return node._backend.KronI(child._c, *[Adjoint(node._backend, c, name=c._name) for c in child._children], name=node._name)
+        elif isinstance(child, VStack) and self.ask("distribute <%s>" % node._name) and False:
+            return node._backend.HStack([Adjoint(node._backend, c, name=c._name) for c in child._children], name=node._name)
+        elif isinstance(child, HStack) and self.ask("distribute <%s>" % node._name) and False:
+            return node._backend.VStack([Adjoint(node._backend, c, name=c._name) for c in child._children], name=node._name)
+        elif isinstance(child, Adjoint) and False:
+            return child._children[0]
+        return node
 
     def _distribute(self, left, right):
         """
