@@ -60,19 +60,24 @@ class Visitor(object):
 
 
 class Optimize(Transform):
-    def visit(self, node):
+    def __init__(self, passes, instructions):
+        self.passes = passes
+        self.instructions = instructions
+
+    def visit(self, node, passes):
         steps = [
             #Normalize,
-            #TreeTransformations,
-            #OperatorTransformations,
+            TreeTransformations,
+            OperatorTransformations,
             RealizeMatrices,
             #CoalesceAdjoints,
             StoreMatricesInAdjointOrder,
         ]
 
-        for Step in steps:
-            log.info("running optimization step: %s" % Step.__name__)
-            node = Step().visit(node)
+        for p in self.passes:
+            for Step in steps:
+                log.info("running optimization step: %s" % Step.__name__)
+                node = Step(self.instructions).visit(node)
 
         return node
 
@@ -94,8 +99,13 @@ class Normalize(Transform):
 
 
 class OperatorTransformations(Transform):
+    def __init__(self, instructions):
+        self.instructions = instructions
+
     def ask(self, op):
-        return np.random.randint(1, 16)
+        answer = np.random.randint(1, 16)
+        self.instructions.append((op, answer))
+        return answer
 
     def visit_Product(self, node):
         batch = self.ask("batch size <%s>" % node._name)
@@ -109,11 +119,19 @@ class TreeTransformations(Transform):
     """
     Manipulates CompositeOperators.
     """
+    def __init__(self, instructions):
+        self.instructions = instructions
+
+    def ask(self, op):
+        answer = bool(np.random.randint(2))
+        self.instructions.append((op, answer))
+        return answer
+
     def visit_Product(self, node):
         node = self.generic_visit(node)
         return node
 
-        if False and self.ask("avoid distributing %s" % node._name):
+        if self.ask("avoid distributing %s" % node._name):
             return node
             
         new_kids = []
@@ -137,7 +155,7 @@ class TreeTransformations(Transform):
         node = self.generic_visit(node)
         new_kids = []
         if all( isinstance(kid,Product) for kid in node._children ) and \
-                self.ask("distribute <%s>" % node._name) and False:
+                self.ask("distribute <%s>" % node._name):
             for grandkids in zip(*[child._children for child in node._children]):
                 new_kids.append( BlockDiag(node._backend, *grandkids) )
             return Product( node._backend, *new_kids, name=node._name )
@@ -149,7 +167,7 @@ class TreeTransformations(Transform):
         node = self.generic_visit(node)
         child = node._children[0]
         if isinstance(child, Product) and \
-                self.ask("distribute <%s>" % node._name) and False:
+                self.ask("distribute <%s>" % node._name):
             grandkids = child._children
             new_kids = [KronI(node._backend, node._c, grandkid, name=child._name) for grandkid in grandkids]
             return Product( node._backend, *new_kids, name=node._name )
@@ -161,7 +179,7 @@ class TreeTransformations(Transform):
         node = self.generic_visit(node)
         new_kids = []
         if all( isinstance(kid,Product) for kid in node._children ) and \
-                self.ask("distribute <%s>" % node._name) and False:
+                self.ask("distribute <%s>" % node._name):
             for grandkids in zip(*[child._children for child in node._children]):
                 new_kids.append( VStack(node._backend, *grandkids) )
             return Product( node._backend, *new_kids, name=node._name )
@@ -172,20 +190,20 @@ class TreeTransformations(Transform):
         """ Adjoint(CompositeOperator(A, B)) => CompositeOperator(Adjoint(B), Adjoint(A)) """
         node = self.generic_visit(node)
         child = node._children[0]
-        if isinstance(child, Product) and self.ask("distribute <%s>" % node._name) and False:
+        if isinstance(child, Product) and self.ask("distribute <%s>" % node._name):
             return Product(node._backend, \
                 Adjoint(node._backend, child.right, name=child.right._name), \
                 Adjoint(node._backend, child.left, name=child.left._name), \
                 name=node._name)
-        elif isinstance(child, BlockDiag) and self.ask("distribute <%s>" % node._name) and False:
+        elif isinstance(child, BlockDiag) and self.ask("distribute <%s>" % node._name):
             return node._backend.BlockDiag([Adjoint(node._backend, c, name=c._name) for c in child._children], name=node._name)
-        elif isinstance(child, KronI) and self.ask("distribute <%s>" % node._name) and False:
+        elif isinstance(child, KronI) and self.ask("distribute <%s>" % node._name):
             return node._backend.KronI(child._c, *[Adjoint(node._backend, c, name=c._name) for c in child._children], name=node._name)
-        elif isinstance(child, VStack) and self.ask("distribute <%s>" % node._name) and False:
+        elif isinstance(child, VStack) and self.ask("distribute <%s>" % node._name):
             return node._backend.HStack([Adjoint(node._backend, c, name=c._name) for c in child._children], name=node._name)
-        elif isinstance(child, HStack) and self.ask("distribute <%s>" % node._name) and False:
+        elif isinstance(child, HStack) and self.ask("distribute <%s>" % node._name):
             return node._backend.VStack([Adjoint(node._backend, c, name=c._name) for c in child._children], name=node._name)
-        elif isinstance(child, Adjoint) and False:
+        elif isinstance(child, Adjoint):
             return child._children[0]
         return node
 
@@ -226,11 +244,20 @@ class RealizeMatrices(Transform):
     Converts CompositeOps into SpMatrix ops if all
     children of the CompositeOp are SpMatrices.
     """
+    def __init__(self, instructions):
+        self.instructions = instructions
+
+    def ask(self, op):
+        answer = bool(np.random.randint(2))
+        self.instructions.append((op, answer))
+        return answer
+
     def visit_Product(self, node):
         """ Product( SpMatrices+ ) => SpMatrix """
         node = self.generic_visit(node)
         left, right = node._children
-        if isinstance(left, SpMatrix) and isinstance(right, SpMatrix):
+        if isinstance(left, SpMatrix) and isinstance(right, SpMatrix) and \
+            self.ask('realize <%s>' % node._name):
             name = "{}*{}".format(left._name, right._name)
             log.debug('computing %s * %s', left._name, right._name)
             m = left._matrix @ right._matrix
@@ -241,7 +268,8 @@ class RealizeMatrices(Transform):
     def visit_VStack(self, node):
         """ VStack( SpMatrices ) => SpMatrix """
         node = self.generic_visit(node)
-        if all(isinstance(c, SpMatrix) for c in node._children):
+        if all(isinstance(c, SpMatrix) for c in node._children) and \
+            self.ask('realize <%s>' % node._name):
             name = "{}+".format(node._children[0]._name)
             dtype = node._children[0].dtype
             log.debug('stacking %s', ', '.join(c._name for c in node._children))
@@ -252,7 +280,8 @@ class RealizeMatrices(Transform):
 
     def dont_visit_BlockDiag(self, node):
         """ BlockDiag( SpMatrices ) => SpMatrix """
-        if all(isinstance(c, SpMatrix) for c in node._children):
+        if all(isinstance(c, SpMatrix) for c in node._children) and \
+            self.ask('realize <%s>' % node._name):
             name = "{}+".format(node._children[0]._name)
             dtype = node._children[0].dtype
             m = spp.block_diag( [c._matrix for c in node._children], dtype=dtype )
@@ -263,7 +292,8 @@ class RealizeMatrices(Transform):
     def dont_visit_KronI(self, node):
         """ KronI(c, SpMatrix) => SpMatrix """
         C = node._children[0]
-        if isinstance(C, SpMatrix):
+        if isinstance(C, SpMatrix) and \
+            self.ask('realize <%s>' % node._name):
             name = "{}+".format(C._name)
             I = spp.eye(node._c, dtype=C.dtype)
             K = spp.kron(I, C._matrix)
@@ -272,7 +302,17 @@ class RealizeMatrices(Transform):
             return node
 
 class StoreMatricesInAdjointOrder(Transform):
+    def __init__(self, instructions):
+        self.instructions = instructions
+
+    def ask(self, op):
+        answer = bool(np.random.randint(2))
+        self.instructions((op, answer))
+        return answer
+
     def visit_SpMatrix(self, node):
         """ SpMatrix => Adjoint(SpMatrix.H) """
         M = node._matrix
-        return SpMatrix( node._backend, M.getH(), name=node._name ).H
+        if self.ask('adjoint <%s>' % node._name):
+            return SpMatrix( node._backend, M.getH(), name=node._name ).H
+
