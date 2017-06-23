@@ -64,6 +64,7 @@ class Optimize(Transform):
         steps = [
             #Normalize,
             #TreeTransformations,
+            #OperatorTransformations,
             RealizeMatrices,
             #CoalesceAdjoints,
             StoreMatricesInAdjointOrder,
@@ -91,6 +92,18 @@ class Normalize(Transform):
         node._adopt(new_kids)
         return node
 
+
+class OperatorTransformations(Transform):
+    def ask(self, op):
+        return np.random.randint(1, 16)
+
+    def visit_Product(self, node):
+        batch = self.ask("batch size <%s>" % node._name)
+        node._batch = batch
+
+    def visit_UnscaledFFT(self, node):
+        batch = self.ask("batch size <%s>" % node._name)
+        node._batch = batch
 
 class TreeTransformations(Transform):
     """
