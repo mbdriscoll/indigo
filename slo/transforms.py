@@ -81,22 +81,25 @@ class Optimize(Transform):
         steps = [
             #Normalize,
             TreeTransformations,
-            OperatorTransformations,
             RealizeMatrices,
+            OperatorTransformations,
             #CoalesceAdjoints,
             #StoreMatricesInAdjointOrder,
         ]
 
 
+        for p in range(self.passes['tree']):
+            log.info('running optimization pass: %s' % TreeTransformations.__name__)
+            node = TreeTransformations(self.instructions).visit(node)
         # Tree
+        for p in range(self.passes['realize']):
+            log.info('running optimization pass: %s' % RealizeMatrices.__name__)
+            node = RealizeMatrices(self.instructions).visit(node)
+
         # Realize
-
-        # Operator
-
-        for p in range(self.passes):
-            for Step in steps:
-                log.info("running optimization step: %s" % Step.__name__)
-                node = Step(self.instructions).visit(node)
+        for p in range(self.passes['operator']):
+            log.info('running optimization pass: %s' % OperatorTransformations.__name__)
+            node = OperatorTransformations(self.instructions).visit(node)
 
         return node
 
