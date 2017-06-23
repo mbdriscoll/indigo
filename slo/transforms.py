@@ -74,6 +74,12 @@ class Optimize(Transform):
             log.info("running optimization step: %s" % Step.__name__)
             node = Step().visit(node)
 
+        # reserve scratch space
+        shape = (node.memusage() // node.dtype.itemsize,)
+        b = node._backend
+        b._scratch = b.empty_array(shape, node.dtype)
+        b._scratch_pos = 0
+
         return node
 
 

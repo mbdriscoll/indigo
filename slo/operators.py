@@ -400,15 +400,13 @@ class Product(CompositeOperator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         L, R = self._children
-        if forward:
-            tmp = self._backend.zero_array((R.shape[0],x.shape[1]), dtype=x.dtype)
-            R.eval(tmp, x, alpha=alpha, beta=0, forward=True)
-            L.eval(y, tmp, alpha=1,  beta=beta, forward=True)
-        else:
-            tmp = self._backend.zero_array((L.shape[1],x.shape[1]), dtype=x.dtype)
-            L.eval(tmp, x, alpha=alpha, beta=0, forward=False)
-            R.eval(y, tmp, alpha=1,  beta=beta, forward=False)
-        del tmp
+        with self._backend.scratch(shape=(R.shape[0],x.shape[1])) as tmp:
+            if forward:
+                R.eval(tmp, x, alpha=alpha, beta=0, forward=True)
+                L.eval(y, tmp, alpha=1,  beta=beta, forward=True)
+            else:
+                L.eval(tmp, x, alpha=alpha, beta=0, forward=False)
+                R.eval(y, tmp, alpha=1,  beta=beta, forward=False)
 
     def _mem_usage(self, ncols):
         ncols = min(ncols, self._batch or ncols)

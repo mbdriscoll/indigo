@@ -2,6 +2,7 @@ import logging
 import abc, time
 import numpy as np
 import scipy.sparse as spp
+from contextlib import contextmanager
 
 import slo.operators as op
 from slo.util import profile
@@ -215,6 +216,27 @@ class Backend(object):
             if n > 1e6:
                 log.info("  %40s: % 3.0f MB, %20s, %15s", name, n/1e6, shape, dtype)
         return nbytes
+
+    @contextmanager
+    def scratch(self, shape=None, nbytes=None):
+        assert not (shape is not None and nbytes is not None), \
+            "Specify either shape or nbytes to backend.scratch()."
+        if nbytes is not None:
+            shape = (nbytes//np.dtype('complex64').itemsize,)
+        size = np.prod(shape)
+        if hasattr(self, '_scratch'):
+            pos = self._scratch_pos
+            total = self._scratch.size
+            assert pos + size <= total, "Not enough scratch memory."
+            mem = self._scratch[pos:pos+size].reshape(shape)
+            self._scratch_pos += size
+            yield mem
+            self._scratch_pos -= size
+        else:
+            log.debug("dynamically allocating scratch space in shape %s", shape)
+            mem = self.zero_array(shape, dtype=np.complex64)
+            yield mem
+            del mem
 
     # -----------------------------------------------------------------------
     # Operator Building Interface 

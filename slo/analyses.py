@@ -12,13 +12,9 @@ class Memusage(Visitor):
     Estimates maximum memory needed for evaluating a tree
     during CG.
     """
-    def measure(self, node, ncols=1, alg='cg'):
-        if alg == 'cg':
-            alg_mem = 4 * node.shape[1] * ncols * node.dtype.itemsize
-        else:
-            raise NotImplementedError("no memusage for %s" % alg)
+    def measure(self, node, ncols=1):
         self._seen = set()
-        self._current_mem  = [alg_mem]
+        self._current_mem  = [0]
         self._current_cols = [ncols]
         self._max_mem = 0
         self.visit(node)

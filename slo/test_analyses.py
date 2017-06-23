@@ -31,15 +31,13 @@ def test_Memusage_Product(backend, L, M, N, K, density, b0, b1, b2):
     x_nbytes  = N * K * A.dtype.itemsize
     bs = min(K, b2 or K)
     tmp_nbytes = A0.shape[1] * bs * A0.dtype.itemsize
-    cg_tmp_nbytes = x_nbytes*4
-    nbytes_exp = a0_nbytes + a1_nbytes + tmp_nbytes + cg_tmp_nbytes
+    nbytes_exp = a0_nbytes + a1_nbytes + tmp_nbytes
     nbytes_act = A.memusage(ncols=K)
     assert nbytes_exp == nbytes_act
 
     # adjoint
     x_nbytes  = L * K * A.dtype.itemsize
     tmp_nbytes = A0.H.shape[0] * bs * A.dtype.itemsize
-    cg_tmp_nbytes = x_nbytes*4
-    nbytes_exp = a0_nbytes + a1_nbytes + tmp_nbytes + cg_tmp_nbytes
+    nbytes_exp = a0_nbytes + a1_nbytes + tmp_nbytes
     nbytes_act = A.H.memusage(ncols=K)
     assert nbytes_exp == nbytes_act
