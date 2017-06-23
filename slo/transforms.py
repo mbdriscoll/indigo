@@ -91,12 +91,9 @@ class Optimize(Transform):
         for p in range(self.passes['tree']):
             log.info('running optimization pass: %s' % TreeTransformations.__name__)
             node = TreeTransformations(self.instructions).visit(node)
-        # Tree
         for p in range(self.passes['realize']):
             log.info('running optimization pass: %s' % RealizeMatrices.__name__)
             node = RealizeMatrices(self.instructions).visit(node)
-
-        # Realize
         for p in range(self.passes['operator']):
             log.info('running optimization pass: %s' % OperatorTransformations.__name__)
             node = OperatorTransformations(self.instructions).visit(node)
@@ -253,14 +250,6 @@ class RealizeMatrices(Transform):
     Converts CompositeOps into SpMatrix ops if all
     children of the CompositeOp are SpMatrices.
     """
-    def __init__(self, instructions):
-        self.instructions = instructions
-
-    def ask(self, op):
-        answer = bool(np.random.randint(2))
-        self.instructions.append((op, answer))
-        return answer
-
     def visit_Product(self, node):
         """ Product( SpMatrices+ ) => SpMatrix """
         node = self.generic_visit(node)
@@ -289,6 +278,7 @@ class RealizeMatrices(Transform):
 
     def visit_BlockDiag(self, node):
         """ BlockDiag( SpMatrices ) => SpMatrix """
+        node = self.generic_visit(node)
         if all(isinstance(c, SpMatrix) for c in node._children) and \
             self.ask_bool('realize <%s>' % node._name):
             name = "{}+".format(node._children[0]._name)
@@ -300,6 +290,7 @@ class RealizeMatrices(Transform):
 
     def visit_KronI(self, node):
         """ KronI(c, SpMatrix) => SpMatrix """
+        node = self.generic_visit(node)
         C = node._children[0]
         if isinstance(C, SpMatrix) and \
             self.ask_bool('realize <%s>' % node._name):
@@ -311,6 +302,7 @@ class RealizeMatrices(Transform):
             return node
 
     def visit_Adjoint(self, node):
+        node = self.generic_visit(node)
         C = node._children[0]
         if isinstance(C, SpMatrix) and \
             self.ask_bool('realize <%s>' % node._name):
