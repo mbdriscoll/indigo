@@ -400,7 +400,7 @@ class Product(CompositeOperator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         L, R = self._children
-        with self._backend.scratch( (R.shape[0],x.shape[1]), x.dtype ) as tmp:
+        with self._backend.scratch(shape=(R.shape[0],x.shape[1])) as tmp:
             if forward:
                 R.eval(tmp, x, alpha=alpha, beta=0, forward=True)
                 L.eval(y, tmp, alpha=1,  beta=beta, forward=True)

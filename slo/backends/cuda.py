@@ -37,6 +37,8 @@ class CudaBackend(Backend):
         self.cudaGetDevice( byref(cu_device) )
         log.info("using CUDA device #%d", cu_device.value)
 
+        self._plans = dict()
+
     class cudaError_t(c_long):
         def _check(self, backend, fn):
             if self.value != 0:
@@ -341,14 +343,29 @@ class CudaBackend(Backend):
     CUFFT_INVERSE =  1
 
     @wrap(cufft)
-    def cufftPlanMany(
-        plan    : POINTER(cufftHandle_t),
+    def cufftSetAutoAllocation(
+        plan : cufftHandle_t,
+        auto : c_int,
+    ) -> cufftResult_t:
+        pass
+
+    @wrap(cufft)
+    def cufftSetWorkArea(
+        plan : cufftHandle_t,
+        area : dndarray,
+    ) -> cufftResult_t:
+        pass
+
+    @wrap(cufft)
+    def cufftMakePlanMany(
+        plan    : cufftHandle_t,
         rank    : c_int,
         n       : POINTER(c_int*3),
         inembed : POINTER(c_int), istride: c_int, idist: c_int,
         onembed : POINTER(c_int), ostride: c_int, odist: c_int,
         typ     : cufftType_t,
         batch   : c_int,
+        workSize: POINTER(c_size_t),
     ) -> cufftResult_t:
         pass
 
@@ -358,26 +375,6 @@ class CudaBackend(Backend):
         idata   : dndarray,
         odata   : dndarray,
         direction : c_int,
-    ) -> cufftResult_t:
-        pass
-
-    @wrap(cufft)
-    def cufftGetSize(
-        plan : cufftHandle_t,
-        size : POINTER(c_size_t),
-    ) -> cufftResult_t:
-        pass
-
-    @wrap(cufft)
-    def cufftGetSizeMany(
-        plan     : cufftHandle_t,
-        rank     : c_int,
-        n        : POINTER(c_int*3),
-        inembed  : POINTER(c_int), istride: c_int, idist: c_int,
-        onembed  : POINTER(c_int), ostride: c_int, odist: c_int,
-        typ      : cufftType_t,
-        batch    : c_int,
-        workSize : POINTER(c_size_t)
     ) -> cufftResult_t:
         pass
 
@@ -393,40 +390,35 @@ class CudaBackend(Backend):
     ) -> cufftResult_t:
         pass
 
-    def _create_plan(self, x):
-        key = 'fft_plan.' + str(tuple((x.shape, x.dtype)))
-        N = x.shape[:3][::-1]
-        dims = (c_int*3)(*N)
-        batch = c_int(x.size // np.prod(N))
-        plan = CudaBackend.cufftHandle_t(self)
-        self.cufftPlanMany(byref(plan), 3, byref(dims),
-            None, 0, 0, None, 0, 0, CudaBackend.CUFFT_C2C, batch)
-        return plan
-
-    def _delete_plan(self, plan):
-        del plan
+    def _get_or_create_plan(self, x_shape):
+        if x_shape not in self._plans:
+            N = x_shape[:3][::-1]
+            dims = (c_int*3)(*N)
+            batch = c_int( np.prod(x_shape[3:]) )
+            plan = CudaBackend.cufftHandle_t(self)
+            ws = c_size_t()
+            self.cufftSetAutoAllocation(plan, 0)
+            self.cufftMakePlanMany(plan, 3, byref(dims),
+                None, 0, 0, None, 0, 0, CudaBackend.CUFFT_C2C,
+                batch, byref(ws))
+            self._plans[x_shape] = (plan, ws.value)
+        return self._plans[x_shape]
 
     def _fft_workspace_size(self, x_shape):
-        x_size = np.prod(x_shape)
-        N = x_shape[:3][::-1]
-        dims = (c_int*3)(*N)
-        batch = c_int(x_size // np.prod(N))
-        workSize = c_size_t()
-        plan = CudaBackend.cufftHandle_t(self)
-        self.cufftGetSizeMany(plan, 3, byref(dims),
-            None, 0, 0, None, 0, 0, CudaBackend.CUFFT_C2C, batch,
-            byref(workSize))
-        return workSize.value
+        plan, workSize = self._get_or_create_plan(x_shape)
+        return workSize
 
     def fftn(self, y, x):
-        plan = self._create_plan(x)
-        self.cufftExecC2C(plan, x, y, CudaBackend.CUFFT_FORWARD)
-        self._delete_plan(plan)
+        plan, workSize = self._get_or_create_plan(x.shape)
+        with self.scratch(nbytes=workSize) as tmp:
+            self.cufftSetWorkArea(plan, tmp)
+            self.cufftExecC2C(plan, x, y, CudaBackend.CUFFT_FORWARD)
 
     def ifftn(self, y, x):
-        plan = self._create_plan(x)
-        self.cufftExecC2C(plan, x, y, CudaBackend.CUFFT_INVERSE)
-        self._delete_plan(plan)
+        plan, workSize = self._get_or_create_plan(x.shape)
+        with self.scratch(nbytes=workSize) as tmp:
+            self.cufftSetWorkArea(plan, tmp)
+            self.cufftExecC2C(plan, x, y, CudaBackend.CUFFT_INVERSE)
 
     # -----------------------------------------------------------------------
     # Cusparse

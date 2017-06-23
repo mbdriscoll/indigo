@@ -218,10 +218,25 @@ class Backend(object):
         return nbytes
 
     @contextmanager
-    def scratch(self, shape, dtype):
-        mem = self.empty_array(shape, dtype)
-        yield mem
-        del mem
+    def scratch(self, shape=None, nbytes=None):
+        assert not (shape is not None and nbytes is not None), \
+            "Specify either shape or nbytes to backend.scratch()."
+        if nbytes is not None:
+            shape = (nbytes//np.dtype('complex64').itemsize,)
+        size = np.prod(shape)
+        if hasattr(self, '_scratch'):
+            pos = self._scratch_pos
+            total = self._scratch.size
+            assert pos + size <= total, "Not enough scratch memory."
+            mem = self._scratch[pos:pos+size].reshape(shape)
+            self._scratch_pos += size
+            yield mem
+            self._scratch_pos -= size
+        else:
+            log.debug("dynamically allocating scratch space in shape %s", shape)
+            mem = self.zero_array(shape, dtype=np.complex64)
+            yield mem
+            del mem
 
     # -----------------------------------------------------------------------
     # Operator Building Interface 
