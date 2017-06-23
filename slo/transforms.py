@@ -9,8 +9,8 @@ from collections import defaultdict
 from slo.operators import (
     CompositeOperator, Product,
     KronI, BlockDiag,
-    VStack, SpMatrix,
-    Adjoint
+    VStack, HStack,
+    SpMatrix, Adjoint
 )
 
 log = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ class Optimize(Transform):
         self.passes = passes
         self.instructions = instructions
 
-    def visit(self, node, passes):
+    def visit(self, node):
         steps = [
             #Normalize,
             TreeTransformations,
@@ -74,7 +74,7 @@ class Optimize(Transform):
             StoreMatricesInAdjointOrder,
         ]
 
-        for p in self.passes:
+        for p in range(self.passes):
             for Step in steps:
                 log.info("running optimization step: %s" % Step.__name__)
                 node = Step(self.instructions).visit(node)
@@ -110,10 +110,12 @@ class OperatorTransformations(Transform):
     def visit_Product(self, node):
         batch = self.ask("batch size <%s>" % node._name)
         node._batch = batch
+        return node
 
     def visit_UnscaledFFT(self, node):
         batch = self.ask("batch size <%s>" % node._name)
         node._batch = batch
+        return node
 
 class TreeTransformations(Transform):
     """
@@ -129,7 +131,6 @@ class TreeTransformations(Transform):
 
     def visit_Product(self, node):
         node = self.generic_visit(node)
-        return node
 
         if self.ask("avoid distributing %s" % node._name):
             return node
@@ -164,6 +165,7 @@ class TreeTransformations(Transform):
 
     def visit_KronI(self, node):
         """ KronI(A*B) => KronI(A)*KronI(B) """
+        return node
         node = self.generic_visit(node)
         child = node._children[0]
         if isinstance(child, Product) and \
@@ -307,7 +309,7 @@ class StoreMatricesInAdjointOrder(Transform):
 
     def ask(self, op):
         answer = bool(np.random.randint(2))
-        self.instructions((op, answer))
+        self.instructions.append((op, answer))
         return answer
 
     def visit_SpMatrix(self, node):
@@ -315,4 +317,5 @@ class StoreMatricesInAdjointOrder(Transform):
         M = node._matrix
         if self.ask('adjoint <%s>' % node._name):
             return SpMatrix( node._backend, M.getH(), name=node._name ).H
+        return node
 

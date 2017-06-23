@@ -77,9 +77,11 @@ class Operator(object):
             name='|   ' * indent + name, type=type(self).__name__,
             shape=self.shape, dtype=self.dtype), file=file)
 
-    def optimize(self):
+    def optimize(self, passes):
         from slo.transforms import Optimize
-        return Optimize().visit(self)
+        instructions = []
+        A = Optimize(passes, instructions).visit(self)
+        return (A, instructions)
 
     def memusage(self, ncols=1):
         from slo.analyses import Memusage
