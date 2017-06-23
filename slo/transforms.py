@@ -108,12 +108,12 @@ class OperatorTransformations(Transform):
         return answer
 
     def visit_Product(self, node):
-        batch = self.ask("batch size <%s>" % node._name)
+        batch = self.ask("batch_size <%s>" % node._name)
         node._batch = batch
         return node
 
     def visit_UnscaledFFT(self, node):
-        batch = self.ask("batch size <%s>" % node._name)
+        batch = self.ask("batch_size <%s>" % node._name)
         node._batch = batch
         return node
 
@@ -132,7 +132,7 @@ class TreeTransformations(Transform):
     def visit_Product(self, node):
         node = self.generic_visit(node)
 
-        if self.ask("avoid distributing %s" % node._name):
+        if not self.ask("distribute %s" % node._name):
             return node
             
         new_kids = []
