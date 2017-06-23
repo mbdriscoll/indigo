@@ -71,8 +71,14 @@ class Optimize(Transform):
             OperatorTransformations,
             RealizeMatrices,
             #CoalesceAdjoints,
-            StoreMatricesInAdjointOrder,
+            #StoreMatricesInAdjointOrder,
         ]
+
+
+        # Tree
+        # Realize
+
+        # Operator
 
         for p in range(self.passes):
             for Step in steps:
@@ -165,14 +171,18 @@ class TreeTransformations(Transform):
 
     def visit_KronI(self, node):
         """ KronI(A*B) => KronI(A)*KronI(B) """
-        return node
         node = self.generic_visit(node)
         child = node._children[0]
         if isinstance(child, Product) and \
                 self.ask("distribute <%s>" % node._name):
             grandkids = child._children
+            for g in grandkids:
+                print('%s: %s' % (g._name, g.shape))
+            print(node.dump())
             new_kids = [KronI(node._backend, node._c, grandkid, name=child._name) for grandkid in grandkids]
-            return Product( node._backend, *new_kids, name=node._name )
+            nn = Product( node._backend, *new_kids, name=node._name )
+            print(nn.dump())
+            return nn
         else:
             return node
 
@@ -182,9 +192,11 @@ class TreeTransformations(Transform):
         new_kids = []
         if all( isinstance(kid,Product) for kid in node._children ) and \
                 self.ask("distribute <%s>" % node._name):
-            for grandkids in zip(*[child._children for child in node._children]):
-                new_kids.append( VStack(node._backend, *grandkids) )
-            return Product( node._backend, *new_kids, name=node._name )
+            leftKids = [child._children[0] for child in node._children]
+            rightKids = [child._children[1] for child in node._children]
+            left = node._backend.BlockDiag(leftKids, name=node._name+'.BlockDiag')
+            right = node._backend.VStack(rightKids, name=node._name+'.VStack')
+            return left*right
         else:
             return node
 
@@ -218,7 +230,7 @@ class TreeTransformations(Transform):
         b = left._backend
 
         if isinstance(left, KronI) and isinstance(right, KronI):
-            return b.KronI( left._c, left._child * right._child, name=left._name )
+            return b.KronI( left._c, left.child * right.child, name=left._name )
 
         signatures = {
             (b.BlockDiag, b.BlockDiag) : b.BlockDiag,
@@ -236,8 +248,8 @@ class TreeTransformations(Transform):
         input_type = ( left.__class__, right.__class__ )
         if input_type in signatures:
             operator = signatures[input_type]
-            lc = repeat( left._child) if isinstance( left, KronI) else  left._children
-            rc = repeat(right._child) if isinstance(right, KronI) else right._children
+            lc = repeat( left.child) if isinstance( left, KronI) else  left._children
+            rc = repeat(right.child) if isinstance(right, KronI) else right._children
             return operator([L*R for L,R in zip(lc,rc)], name=left._name)
 
 
@@ -280,7 +292,7 @@ class RealizeMatrices(Transform):
         else:
             return node
 
-    def dont_visit_BlockDiag(self, node):
+    def visit_BlockDiag(self, node):
         """ BlockDiag( SpMatrices ) => SpMatrix """
         if all(isinstance(c, SpMatrix) for c in node._children) and \
             self.ask('realize <%s>' % node._name):
@@ -291,7 +303,7 @@ class RealizeMatrices(Transform):
         else:
             return node
 
-    def dont_visit_KronI(self, node):
+    def visit_KronI(self, node):
         """ KronI(c, SpMatrix) => SpMatrix """
         C = node._children[0]
         if isinstance(C, SpMatrix) and \
@@ -302,6 +314,16 @@ class RealizeMatrices(Transform):
             return SpMatrix( node._backend, K, name=name )
         else:
             return node
+
+    def visit_Adjoint(self, node):
+        C = node._children[0]
+        if isinstance(C, SpMatrix) and \
+            self.ask('realize <%s>' % node._name):
+            name = '{}.H'.format(C._name)
+            return SpMatrix( node._backend, C._matrix.getH(), name=name )
+        else:
+            return node
+
 
 class StoreMatricesInAdjointOrder(Transform):
     def __init__(self, instructions):
