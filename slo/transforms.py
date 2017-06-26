@@ -255,6 +255,18 @@ class RealizeMatrices(Transform):
             return SpMatrix( node._backend, m, name=name )
         else:
             return node
+    
+    def visit_HStack(self, node):
+        """ HStack( SpMatrices ) => SpMatrix """
+        node = self.generic_visit(node)
+        if all(isinstance(c, SpMatrix) for c in node._children):
+            name = "{}+".format(node._children[0]._name)
+            dtype = node._children[0].dtype
+            log.debug('stacking %s', ', '.join(c._name for c in node._children))
+            m = spp.hstack( [c._matrix for c in node._children], dtype=dtype )
+            return SpMatrix( node._backend, m, name=name )
+        else:
+            return node
 
     def dont_visit_BlockDiag(self, node):
         """ BlockDiag( SpMatrices ) => SpMatrix """
