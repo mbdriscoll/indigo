@@ -556,5 +556,5 @@ class Backend(object):
                 self.axpy(z, (1-s)/t, o) # z += (1-s)/t*o
 
                 r2 = self.pnorm2(x, team)
-                log.info("iter %d, residual %g", it, r2.real)
+                log.info("iter %d, norm %g", it, abs(r2))
         x.copy_to(x_h)
