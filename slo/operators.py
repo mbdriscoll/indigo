@@ -6,7 +6,7 @@ import itertools
 import numpy as np
 import scipy.sparse as spp
 
-from slo.util import profile
+from slo.util import profiler
 
 log = logging.getLogger(__name__)
 
@@ -176,7 +176,7 @@ class SpMatrix(Operator):
         else:
             purpose = '?'
 
-        with profile("csrmm", nbytes=nbytes, nthreads=nthreads, purpose=purpose, shape=x.shape):
+        with profiler("csrmm", nbytes=nbytes, nthreads=nthreads, purpose=purpose, shape=x.shape):
             if forward:
                 M_d.forward(y, x, alpha=alpha, beta=beta)
             else:
@@ -213,7 +213,7 @@ class DenseMatrix(Operator):
         M_d = self._get_or_create_device_matrix()
         (m, n), k = M_d.shape, x.shape[1]
         nflops = m * n * k * 5
-        with profile("cgemm", nflops=nflops):
+        with profiler("cgemm", nflops=nflops):
             self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward)
 
 
@@ -241,7 +241,7 @@ class UnscaledFFT(Operator):
         nflops = batch * 5 * u*v*w * np.log2(u*v*w)
         nbytes = X.nbytes * 2 + Y.nbytes * 2
 
-        with profile("fft", nflops=nflops, shape=X.shape):
+        with profiler("fft", nflops=nflops, shape=X.shape):
             if forward:
                 self._backend.fftn(Y, X)
             else:

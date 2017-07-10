@@ -5,7 +5,7 @@ import scipy.sparse as spp
 from contextlib import contextmanager
 
 import slo.operators as op
-from slo.util import profile
+from slo.util import profiler
 
 log = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class Backend(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, device_id=0):
-        profile._backend = self
+        profiler._backend = self
 
     class dndarray(object):
         """
@@ -495,8 +495,8 @@ class Backend(object):
         r0 = rr
 
         for it in range(maxiter):
-            profile.extra['it'] = it
-            with profile("iter"):
+            profiler.extra['it'] = it
+            with profiler("iter"):
                 A.eval(Ap, p)
                 self.axpy(Ap, lamda, p)
                 alpha = rr / self.pdot(p, Ap, team)
@@ -538,8 +538,8 @@ class Backend(object):
 
         t = 1.0
         for it in range(maxiter):
-            profile.extra['it'] = it
-            with profile("iter"):
+            profiler.extra['it'] = it
+            with profiler("iter"):
 
                 o.copy(x)
                 s = t

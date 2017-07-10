@@ -30,7 +30,7 @@ def randM(M, N, density):
     return A
 
 
-class profile(object):
+class profiler(object):
     extra = dict()
 
     def __init__(self, event, **kwargs):
@@ -42,6 +42,14 @@ class profile(object):
             return
 
         self._backend.barrier()
+
+        # add MPI barriers before operations that specify 'comm' key
+        if 'comm' in self._kwargs:
+            comm = self._kwargs['comm']
+            if log.getEffectiveLevel() <= logging.DEBUG:
+                with profiler("imbalance", size=comm.size):
+                    comm.Barrier()
+
         self._start = time.time()
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -64,6 +72,11 @@ class profile(object):
             data['membw_rate'] = data['nbytes'] / data['duration'] * 1e-9
             del data['nbytes']
 
+        if 'comm' in data:
+            comm = data['comm']
+            data['size'] = comm.size
+            del data['comm']
+
         kvs = sorted(data.items(), key=lambda kv: kv[0])
 
         def fmt(k, v):
@@ -72,7 +85,7 @@ class profile(object):
             else:
                 return k, repr(v)
 
-        msg = "PROFILE(%s)" % ", ".join("%s=%s" % fmt(*kv) for kv in kvs)
+        msg = "PROFILER(%s)" % ", ".join("%s=%s" % fmt(*kv) for kv in kvs)
         log.debug(msg)
 
 
