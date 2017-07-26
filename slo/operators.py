@@ -162,6 +162,7 @@ class SpMatrix(Operator):
             M = self._matrix.tocsr()
             M.sort_indices() # cuda requires sorted indictes
             self._matrix_d = self._backend.csr_matrix(self._backend, M, self._name)
+
         return self._matrix_d
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):

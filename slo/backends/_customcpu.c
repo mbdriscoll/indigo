@@ -5,9 +5,8 @@
 
 #include <omp.h>
 
-
 __attribute__((optimize("unroll-loops")))
-void custom_ccsrmm(
+void custom_ccc_csrmm(
     int transA, int M, int N, int K, complex float alpha,
     complex float *val, int *col, int *pntrb, int *pntre,
     complex float *B, int ldb, complex float beta,
@@ -61,6 +60,61 @@ void custom_ccsrmm(
     }
 }
 
+__attribute__((optimize("unroll-loops")))
+void custom_cfc_csrmm(
+    int transA, int M, int N, int K, complex float alpha,
+    float *val, int *col, int *pntrb, int *pntre,
+    complex float *B, int ldb, complex float beta,
+    complex float *C, int ldc
+) { 
+    if (transA) {
+        #pragma omp parallel
+        {
+            #pragma omp for
+            for (int k = 0; k < K; k++)
+            for (int n = 0; n < N; n++)
+                C[k+n*ldc] *= beta;
+
+            #pragma omp for schedule(guided)
+            for (int m = 0; m < M; m++) {
+                for (int i = pntrb[m]; i < pntre[m]; i++) {
+                    int k = col[i];
+                    float A_km = val[i];
+                    for (int n = 0; n < N; n++) {
+                        complex float ans = alpha * A_km * B[m+n*ldb];
+                        float *acc = (float*) &C[k+n*ldc];
+
+                        #pragma omp atomic
+                        acc[0] += crealf(ans);
+                        
+                        #pragma omp atomic
+                        acc[1] += cimagf(ans);
+                    }
+                }
+            }   
+        }
+    } else {
+        #pragma omp parallel
+        {
+            complex float acc[N];
+
+            #pragma omp for schedule(guided)
+            for (int m = 0; m < M; m++) {
+                for (int n = 0; n < N; n++)
+                    acc[n] = 0;
+                for (int i = pntrb[m]; i < pntre[m]; i++) {
+                    int k = col[i];
+                    float v = val[i];
+                    for (int n = 0; n < N; n++)
+                        acc[n] += v * B[k+n*ldb];
+                }
+                for (int n = 0; n < N; n++)
+                    C[m+n*ldc] = alpha * acc[n] + beta * C[m+n*ldc];
+            }   
+        }
+    }
+}
+
 
 // --------------------------------------------------------------------------
 // Python interface
@@ -72,7 +126,7 @@ void custom_ccsrmm(
 #include <numpy/arrayobject.h>
 
 static PyObject*
-py_ccsrmm(PyObject *self, PyObject *args)
+py_csrmm(PyObject *self, PyObject *args)
 {
     PyObject *py_alpha, *py_beta;
     int adjoint, ldx, ldy, M, N, K;
@@ -85,7 +139,7 @@ py_ccsrmm(PyObject *self, PyObject *args)
 
     int *rowPtrs = PyArray_DATA(py_rowptr);
     int *colInds = PyArray_DATA(py_colind);
-    complex float *values = PyArray_DATA(py_vals),
+    void *values = PyArray_DATA(py_vals),
                   *Y = PyArray_DATA(py_Y),
                   *X = PyArray_DATA(py_X);
 
@@ -96,13 +150,17 @@ py_ccsrmm(PyObject *self, PyObject *args)
     complex float alpha = alpha_r + I * alpha_i,
                    beta =  beta_r + I *  beta_i;
 
-    custom_ccsrmm(adjoint, M, N, K, alpha, values, colInds, &rowPtrs[0], &rowPtrs[1], X, ldx, beta, Y, ldy);
+    PyArray_Descr *descr = PyArray_DTYPE(py_vals);
+    if ( PyDataType_ISCOMPLEX(descr) )
+        custom_ccc_csrmm(adjoint, M, N, K, alpha, values, colInds, &rowPtrs[0], &rowPtrs[1], X, ldx, beta, Y, ldy);
+    else
+        custom_cfc_csrmm(adjoint, M, N, K, alpha, values, colInds, &rowPtrs[0], &rowPtrs[1], X, ldx, beta, Y, ldy);
 
     Py_RETURN_NONE;
 }
 
 static PyMethodDef _customcpuMethods[] = {
-    { "ccsrmm", py_ccsrmm, METH_VARARGS, NULL },
+    { "csrmm", py_csrmm, METH_VARARGS, NULL },
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 

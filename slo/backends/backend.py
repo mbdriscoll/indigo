@@ -436,6 +436,7 @@ class Backend(object):
             """
             if not isinstance(A, spp.csr_matrix):
                 A = A.tocsr()
+            A = self._type_correct(A)
             self._backend = backend
             self.rowPtrs = backend.copy_array(A.indptr + self._index_base, name=name+".rowPtrs")
             self.colInds = backend.copy_array(A.indices + self._index_base, name=name+".colInds")
@@ -462,6 +463,9 @@ class Backend(object):
         @property
         def nnz(self):
             return self.values.size
+
+        def _type_correct(self, A):
+            return A.astype(np.complex64)
 
     # -----------------------------------------------------------------------
     # Algorithms
