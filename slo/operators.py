@@ -169,14 +169,7 @@ class SpMatrix(Operator):
         nbytes = M_d.nbytes + x.nbytes + (y.nbytes * (1 if beta == 0 else 2))
         nthreads = self._backend.get_max_threads()
 
-        if 'interp' in self._name:
-            purpose = 'grid ' + ('forward' if forward else 'adjoint')
-        elif 'map' in self._name:
-            purpose = 'maps ' + ('forward' if forward else 'adjoint')
-        else:
-            purpose = '?'
-
-        with profile("csrmm", nbytes=nbytes, nthreads=nthreads, purpose=purpose, shape=x.shape):
+        with profile("csrmm", nbytes=nbytes, nthreads=nthreads, shape=x.shape):
             if forward:
                 M_d.forward(y, x, alpha=alpha, beta=beta)
             else:
