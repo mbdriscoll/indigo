@@ -19,7 +19,7 @@ class dim:
 
 parser = argparse.ArgumentParser(description='Parallel Imaging and Compressed Sensing.')
 parser.add_argument('-i', type=int, default=20, help='number of iterations')
-parser.add_argument('--backend', type=str, default='numpy', choices=['mkl', 'numpy', 'cuda'])
+parser.add_argument('--backend', type=str, default='numpy', choices=['mkl', 'numpy', 'cuda', 'customcpu'])
 parser.add_argument('--debug', type=int, default=logging.INFO, help='logging level')
 parser.add_argument('--crop', help='crop data before recon: --crop "COIL:2,TIME:4')
 parser.add_argument('data', nargs='?', default="scan.h5", help='kspace data in an HDF file')
@@ -36,6 +36,8 @@ elif args.backend == 'cuda':
     from slo.backends.cuda import CudaBackend as BACKEND
 elif args.backend == 'numpy':
     from slo.backends.np   import NumpyBackend as BACKEND
+elif args.backend == 'customcpu':
+    from slo.backends.customcpu import CustomCpuBackend as BACKEND
 else:
     log.error("unrecognized backend: %s", args.backend)
 B = BACKEND()
