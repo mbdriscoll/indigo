@@ -77,6 +77,10 @@ traj[0] /= mps.shape[0]
 traj[1] /= mps.shape[1]
 traj[2] /= mps.shape[2]
 
+print("traj[0]: %f %f" % (np.amin(traj[0]), np.amax(traj[0])))
+print("traj[1]: %f %f" % (np.amin(traj[1]), np.amax(traj[1])))
+print("traj[2]: %f %f" % (np.amin(traj[2]), np.amax(traj[2])))
+
 # construct operators
 C = ksp.shape[dim.COIL]
 T = ksp.shape[dim.TIME]
