@@ -6,6 +6,7 @@
 #include <omp.h>
 
 
+__attribute__((optimize("unroll-loops")))
 void custom_ccsrmm(
     int transA, int M, int N, int K, complex float alpha,
     complex float *val, int *col, int *pntrb, int *pntre,

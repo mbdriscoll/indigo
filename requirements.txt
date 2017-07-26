@@ -3,6 +3,7 @@ channels:
 - defaults
 - conda-forge
 dependencies:
+- gcc=4.8.5=7
 - h5py=2.7.0=np112py35_0
 - hdf5=1.8.17=11
 - numexpr=2.6.2=np112py35_0
