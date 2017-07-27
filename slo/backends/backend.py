@@ -351,7 +351,7 @@ class Backend(object):
 
         beta = np.pi * np.sqrt(((width * 2. / oversamp) * (oversamp - 0.5)) ** 2 - 0.8)
         kb = signal.kaiser(2 * n + 1, beta)[n:]
-        G = self.Interp(oN, coord, width, kb, dtype=dtype, name='interp')
+        G = self.Interp(oN, coord, width, kb, dtype=np.float32, name='interp')
 
         r = rolloff3(oversamp, width, beta, N)
         R = self.Diag(r, name='apod')

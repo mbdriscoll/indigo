@@ -48,7 +48,6 @@ hdf = h5py.File(args.data, 'r+')
 data = hdf['data']
 maps = hdf['maps']
 traj = hdf['traj']
-dcf  = hdf['dcf']
 
 # crop input data
 crops = [1e6] * dim.NDIM
@@ -60,7 +59,6 @@ if args.crop:
 # Read subsets of data to work on
 ksp  = data[tuple(slice(0,min(n,c)) for n,c in zip(data.shape, crops))].T
 mps  = maps[tuple(slice(0,min(n,c)) for n,c in zip(maps.shape, crops))].T
-dcf  =  dcf[tuple(slice(0,min(n,c)) for n,c in zip(dcf.shape,  crops))].T
 traj = traj[tuple(slice(0,min(n,c)) for n,c in zip(traj.shape, crops))].T
 
 # determine dimensions
@@ -71,7 +69,6 @@ img_dims    = mps.shape[:3] + (1,) + ksp.shape[4:]
 log.info('img %s %s', img_dims, ksp.dtype)
 log.info('mps %s %s', mps.shape, mps.dtype) 
 log.info('ksp %s %s', ksp.shape, ksp.dtype)
-log.info('dcf %s %s', dcf.shape, dcf.dtype)
 log.info('trj %s %s', traj.shape, traj.dtype)
 
 # normalize trajectory coords
@@ -102,9 +99,8 @@ slc[dim.PHS2] = slice(None)
 Gs = []
 for t in range(T):
     slc[dim.TIME] = t
-    P_t = B.Diag( np.sqrt(dcf[slc]), name='dcf' )
     G_t, Mk, S, F, Mx, Z, R = B.NUFFT(ksp_nc_dims[:3], ksp_c_dims[:3], traj[slc], dtype=ksp.dtype)
-    Gs.append( P_t * G_t * Mk * S )
+    Gs.append( G_t * Mk * S )
 
 S = B.KronI(T, B.VStack([Mx * Z * R * Sc for Sc in Ss], name='maps'))
 F = B.KronI(T*C, F, name='batch_fft')
@@ -121,7 +117,6 @@ alg_mem = 4 * AHA.shape[1] * ksp.dtype.itemsize
 log.info('using %d MB of device memory' % ((node_mem+alg_mem)/1e6))
 
 # prep data
-ksp *= np.sqrt(dcf)
 AHy = A.H * ksp
 AHy /= abs(AHy).max()
 x = np.zeros((AHA.shape[1],1), dtype=ksp.dtype, order='F')

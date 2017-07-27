@@ -26,9 +26,6 @@ class Operator(object):
            x.shape[1] != y.shape[1]:
             raise ValueError("Dimension mismatch: attemping {} = {} * {} ({}, {})".format(
                 y.shape, (M,N), x.shape, forward, type(self)))
-        if not( x.dtype == self.dtype == y.dtype ):
-            raise ValueError("Dtype mismatch: attemping {} = {} * {}".format(
-                y.dtype, self.dtype, x.dtype))
 
         batch_size = self._batch or x.shape[1]
         for b in range(0, x.shape[1], batch_size):
@@ -101,11 +98,6 @@ class CompositeOperator(Operator):
         return self._children[0]
 
     def _adopt(self, children):
-        dtypes = [child.dtype for child in children]
-        names  = [child._name for child in children]
-        if len(set(dtypes)) > 1:
-            raise ValueError("Operators have inconsistent dtypes: {}".format(
-                set(dtypes)))
         self._children = children
 
     def _dump(self, file, indent=0):
@@ -141,7 +133,6 @@ class SpMatrix(Operator):
         """
         super().__init__(backend, **kwargs)
         assert isinstance(M, spp.spmatrix)
-        assert M.dtype == np.dtype('complex64')
         self._matrix = M
         self._matrix_d = None
 
