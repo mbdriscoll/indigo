@@ -154,18 +154,25 @@ class SpMatrix(Operator):
             M.sort_indices() # cuda requires sorted indictes
             self._matrix_d = self._backend.csr_matrix(self._backend, M, self._name)
 
-        return self._matrix_d
+            MH = self._matrix.getH().tocsr()
+            MH.sort_indices() # cuda requires sorted indictes
+            self._matrixH_d = self._backend.csr_matrix(self._backend, MH, self._name + ".H")
+
+        return self._matrix_d, self._matrixH_d
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
-        M_d = self._get_or_create_device_matrix()
-        nbytes = M_d.nbytes + x.nbytes + (y.nbytes * (1 if beta == 0 else 2))
+        M_d, MH_d = self._get_or_create_device_matrix()
+        if forward:
+            M = M_d
+            read_frac, write_frac = M_d._row_frac, M_d._col_frac
+        else:
+            M = MH_d
+            write_frac, read_frac = M_d._row_frac, M_d._col_frac
+        nbytes = M_d.nbytes + x.nbytes*read_frac+ y.nbytes*(1+write_frac)
         nthreads = self._backend.get_max_threads()
 
-        with profile("csrmm", nbytes=nbytes, nthreads=nthreads, shape=x.shape):
-            if forward:
-                M_d.forward(y, x, alpha=alpha, beta=beta)
-            else:
-                M_d.adjoint(y, x, alpha=alpha, beta=beta)
+        with profile("csrmm", nbytes=nbytes, nthreads=nthreads, shape=x.shape, forward=forward, frac_read=read_frac, frac_write=write_frac):
+            M.forward(y, x, alpha=alpha, beta=beta)
 
 
 class DenseMatrix(Operator):

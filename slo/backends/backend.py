@@ -444,6 +444,12 @@ class Backend(object):
             self.shape = A.shape
             self.dtype = A.dtype
 
+            # fraction of nonzero rows/columns
+            self._row_frac = sum(A.indptr[1:]-A.indptr[:-1] > 0) / A.shape[0]
+            self._col_frac = len(set(A.indices))                 / A.shape[1]
+            log.debug("matrix %s has %2d%% nonzero rows and %2d%% nonzero columns",
+                name, 100*self._row_frac, 100*self._col_frac)
+
         def forward(self, y, x, alpha=1, beta=0):
             """ y[:] = A * x """
             self._backend.ccsrmm(y,

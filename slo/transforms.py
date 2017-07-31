@@ -67,7 +67,6 @@ class Optimize(Transform):
             #OperatorTransformations,
             RealizeMatrices,
             #CoalesceAdjoints,
-            StoreMatricesInAdjointOrder,
         ]
 
         for Step in steps:

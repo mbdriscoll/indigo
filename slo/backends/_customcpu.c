@@ -15,6 +15,8 @@ void custom_ccc_csrmm(
     if (transA) {
         #pragma omp parallel
         {
+            complex float acc[N];
+
             #pragma omp for
             for (int k = 0; k < K; k++)
             for (int n = 0; n < N; n++)
@@ -24,16 +26,17 @@ void custom_ccc_csrmm(
             for (int m = 0; m < M; m++) {
                 for (int i = pntrb[m]; i < pntre[m]; i++) {
                     int k = col[i];
-                    complex float A_km = conjf(val[i]);
-                    for (int n = 0; n < N; n++) {
-                        complex float ans = alpha * A_km * B[m+n*ldb];
-                        float *acc = (float*) &C[k+n*ldc];
+                    complex float A_km = alpha * conjf(val[i]);
 
+                    for (int n = 0; n < N; n++)
+                        acc[n] = A_km * B[m+n*ldb];
+
+                    for (int n = 0; n < N; n++) {
+                        float *out = (float*) &C[k+n*ldc];
                         #pragma omp atomic
-                        acc[0] += crealf(ans);
-                        
+                        out[0] += crealf(acc[n]);
                         #pragma omp atomic
-                        acc[1] += cimagf(ans);
+                        out[1] += cimagf(acc[n]);
                     }
                 }
             }   
@@ -59,62 +62,6 @@ void custom_ccc_csrmm(
         }
     }
 }
-
-__attribute__((optimize("unroll-loops")))
-void custom_cfc_csrmm(
-    int transA, int M, int N, int K, complex float alpha,
-    float *val, int *col, int *pntrb, int *pntre,
-    complex float *B, int ldb, complex float beta,
-    complex float *C, int ldc
-) { 
-    if (transA) {
-        #pragma omp parallel
-        {
-            #pragma omp for
-            for (int k = 0; k < K; k++)
-            for (int n = 0; n < N; n++)
-                C[k+n*ldc] *= beta;
-
-            #pragma omp for schedule(guided)
-            for (int m = 0; m < M; m++) {
-                for (int i = pntrb[m]; i < pntre[m]; i++) {
-                    int k = col[i];
-                    float A_km = val[i];
-                    for (int n = 0; n < N; n++) {
-                        complex float ans = alpha * A_km * B[m+n*ldb];
-                        float *acc = (float*) &C[k+n*ldc];
-
-                        #pragma omp atomic
-                        acc[0] += crealf(ans);
-                        
-                        #pragma omp atomic
-                        acc[1] += cimagf(ans);
-                    }
-                }
-            }   
-        }
-    } else {
-        #pragma omp parallel
-        {
-            complex float acc[N];
-
-            #pragma omp for schedule(guided)
-            for (int m = 0; m < M; m++) {
-                for (int n = 0; n < N; n++)
-                    acc[n] = 0;
-                for (int i = pntrb[m]; i < pntre[m]; i++) {
-                    int k = col[i];
-                    float v = val[i];
-                    for (int n = 0; n < N; n++)
-                        acc[n] += v * B[k+n*ldb];
-                }
-                for (int n = 0; n < N; n++)
-                    C[m+n*ldc] = alpha * acc[n] + beta * C[m+n*ldc];
-            }   
-        }
-    }
-}
-
 
 // --------------------------------------------------------------------------
 // Python interface
@@ -154,7 +101,7 @@ py_csrmm(PyObject *self, PyObject *args)
     if ( PyDataType_ISCOMPLEX(descr) )
         custom_ccc_csrmm(adjoint, M, N, K, alpha, values, colInds, &rowPtrs[0], &rowPtrs[1], X, ldx, beta, Y, ldy);
     else
-        custom_cfc_csrmm(adjoint, M, N, K, alpha, values, colInds, &rowPtrs[0], &rowPtrs[1], X, ldx, beta, Y, ldy);
+        assert(0 && "float times complex not implemented");
 
     Py_RETURN_NONE;
 }
