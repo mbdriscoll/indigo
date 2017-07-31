@@ -162,12 +162,8 @@ class SpMatrix(Operator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         M_d, MH_d = self._get_or_create_device_matrix()
-        if forward:
-            M = M_d
-            read_frac, write_frac = M_d._row_frac, M_d._col_frac
-        else:
-            M = MH_d
-            write_frac, read_frac = M_d._row_frac, M_d._col_frac
+        M = M_d if forward else MH_d
+        read_frac, write_frac = M._row_frac, M._col_frac
         nbytes = M_d.nbytes + x.nbytes*read_frac+ y.nbytes*(1+write_frac)
         nthreads = self._backend.get_max_threads()
 
