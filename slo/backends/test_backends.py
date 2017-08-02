@@ -142,18 +142,13 @@ def test_fft(backend, batch, x, y, z):
     np.testing.assert_allclose(v, v_act / (x*y*z), atol=1e-6)
 
 
-@pytest.mark.parametrize("backend,M,N,K,density,dtype",
-    product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0.01,0.1,0.5], ['f','c'])
+@pytest.mark.parametrize("backend,M,N,K,density",
+    product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0.01,0.1,0.5] )
 )
-def test_csr_matrix(backend, M, N, K, density, dtype):
+def test_csr_matrix(backend, M, N, K, density):
     b = backend()
     c = np.dtype('complex64')
-    if dtype == 'c':
-        A_r = spp.random(M, N, density=density, format='csr', dtype=np.float32)
-        A_i = spp.random(M, N, density=density, format='csr', dtype=np.float32)
-        A = (A_r + 1j * A_i).astype(c)
-    else:
-        A = spp.random(M, N, density=density, format='csr', dtype=np.float32)
+    A = slo.util.randM(M, N, density)
     A_d = b.csr_matrix(b, A)
 
     # forward

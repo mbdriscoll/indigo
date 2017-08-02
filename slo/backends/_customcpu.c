@@ -5,38 +5,42 @@
 
 #include <omp.h>
 
-__attribute__((optimize("unroll-loops")))
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 void custom_ccc_csrmm(
-    int transA, int M, int N, int K, complex float alpha,
-    complex float *val, int *col, int *pntrb, int *pntre,
-    complex float *B, int ldb, complex float beta,
-    complex float *C, int ldc
+    unsigned int transA, unsigned int M, unsigned int N, unsigned int K, complex float alpha,
+    complex float *val, unsigned int *col, unsigned int *pntrb, unsigned int *pntre,
+    complex float *B, unsigned int ldb, complex float beta,
+    complex float *C, unsigned int ldc
 ) { 
     if (transA) {
         #pragma omp parallel
         {
-            complex float acc[N];
+            #pragma omp for schedule(static)
+            for (unsigned int k = 0; k < K; k++) {
+                #pragma unroll
+                for (unsigned int n = 0; n < N; n++) {
+                    C[k+n*ldc] *= beta;
+                }
+            }
 
-            #pragma omp for
-            for (int k = 0; k < K; k++)
-            for (int n = 0; n < N; n++)
-                C[k+n*ldc] *= beta;
+             #pragma omp for schedule(static)
+             for (unsigned int m = 0; m < M; m++) {
+                for (unsigned int i = pntrb[m]; i < pntre[m]; i++) {
+                    unsigned int k = col[i];
+                    complex float v = alpha * conjf(val[i]);
 
-            #pragma omp for schedule(guided)
-            for (int m = 0; m < M; m++) {
-                for (int i = pntrb[m]; i < pntre[m]; i++) {
-                    int k = col[i];
-                    complex float A_km = alpha * conjf(val[i]);
-
-                    for (int n = 0; n < N; n++)
-                        acc[n] = A_km * B[m+n*ldb];
-
-                    for (int n = 0; n < N; n++) {
+                    #pragma unroll
+                    for (unsigned int n = 0; n < N; n++) {
+                        complex float res = v * B[m+n*ldb];
                         float *out = (float*) &C[k+n*ldc];
+
                         #pragma omp atomic
-                        out[0] += crealf(acc[n]);
+                        out[0] += crealf(res);
+
                         #pragma omp atomic
-                        out[1] += cimagf(acc[n]);
+                        out[1] += cimagf(res);
                     }
                 }
             }   
@@ -44,21 +48,26 @@ void custom_ccc_csrmm(
     } else {
         #pragma omp parallel
         {
-            complex float acc[N];
+            complex float * acc = malloc(N * sizeof(complex float));
 
-            #pragma omp for schedule(guided)
-            for (int m = 0; m < M; m++) {
-                for (int n = 0; n < N; n++)
+            #pragma omp for schedule(static)
+            for (unsigned int m = 0; m < M; m++) {
+                #pragma unroll
+                for (unsigned int n = 0; n < N; n++)
                     acc[n] = 0;
-                for (int i = pntrb[m]; i < pntre[m]; i++) {
-                    int k = col[i];
+                for (unsigned int i = pntrb[m]; i < pntre[m]; i++) {
+                    unsigned int k = col[i];
                     complex float v = val[i];
-                    for (int n = 0; n < N; n++)
+                    #pragma unroll
+                    for (unsigned int n = 0; n < N; n++)
                         acc[n] += v * B[k+n*ldb];
                 }
-                for (int n = 0; n < N; n++)
+                #pragma unroll
+                for (unsigned int n = 0; n < N; n++)
                     C[m+n*ldc] = alpha * acc[n] + beta * C[m+n*ldc];
             }   
+
+            free(acc);
         }
     }
 }
@@ -76,7 +85,7 @@ static PyObject*
 py_csrmm(PyObject *self, PyObject *args)
 {
     PyObject *py_alpha, *py_beta;
-    int adjoint, ldx, ldy, M, N, K;
+    unsigned int adjoint, ldx, ldy, M, N, K;
     PyArrayObject *py_Y, *py_colind, *py_rowptr, *py_vals, *py_X;
     if (!PyArg_ParseTuple(args, "piiiOOOOOiOOi",
         &adjoint, &M, &N, &K, &py_alpha,
@@ -84,8 +93,8 @@ py_csrmm(PyObject *self, PyObject *args)
         &py_X, &ldx, &py_beta, &py_Y, &ldy))
         return NULL;
 
-    int *rowPtrs = PyArray_DATA(py_rowptr);
-    int *colInds = PyArray_DATA(py_colind);
+    unsigned int *rowPtrs = PyArray_DATA(py_rowptr);
+    unsigned int *colInds = PyArray_DATA(py_colind);
     void *values = PyArray_DATA(py_vals),
                   *Y = PyArray_DATA(py_Y),
                   *X = PyArray_DATA(py_X);

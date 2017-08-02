@@ -1,4 +1,5 @@
 import numpy as np
+from ctypes import cdll
 
 from slo.backends.mkl import MklBackend
 from slo.backends import _customcpu

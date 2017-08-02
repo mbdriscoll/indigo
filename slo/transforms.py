@@ -67,6 +67,7 @@ class Optimize(Transform):
             #OperatorTransformations,
             RealizeMatrices,
             #CoalesceAdjoints,
+            StoreMatricesInBestOrder,
         ]
 
         for Step in steps:
@@ -288,8 +289,11 @@ class RealizeMatrices(Transform):
         else:
             return node
 
-class StoreMatricesInAdjointOrder(Transform):
+class StoreMatricesInBestOrder(Transform):
     def visit_SpMatrix(self, node):
         """ SpMatrix => Adjoint(SpMatrix.H) """
-        M = node._matrix
-        return SpMatrix( node._backend, M.getH(), name=node._name ).H
+        if 'interp' in node._name:
+            return node
+        else:
+            M = node._matrix
+            return SpMatrix( node._backend, M.getH(), name=node._name ).H
