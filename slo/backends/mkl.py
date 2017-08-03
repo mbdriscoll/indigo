@@ -36,6 +36,8 @@ class MklBackend(Backend):
     # Arrays
     # -----------------------------------------------------------------------
     class dndarray(Backend.dndarray):
+        _align = 64
+
         def _copy_from(self, arr):
             self._arr.flat[:] = arr.flat
 
@@ -48,10 +50,16 @@ class MklBackend(Backend):
             dst.flat[:] = src.flat
 
         def _malloc(self, shape, dtype):
-            return np.ndarray(shape, dtype, order='F')
+            elems = np.prod(shape) + self._align
+            self._arr_orig = arr = np.ndarray(elems, dtype)
+            while arr.ctypes.get_data() % self._align != 0:
+                arr = arr[1:]
+            arr = arr[:np.prod(shape)]
+            arr = np.asfortranarray(arr.reshape(shape))
+            return arr
 
         def _free(self):
-            del self._arr
+            del self._arr_orig
 
         def _zero(self):
             self._arr[:] = 0

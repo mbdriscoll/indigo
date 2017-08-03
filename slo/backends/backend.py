@@ -340,20 +340,35 @@ class Backend(object):
         assert len(N) == 3
         assert M[1:] == coord.shape[1:]
 
+        # target 448 x 270 x 640
+        #   448 x 270 x 640   mkl-batch: 170.83 ms, 237.51 gflop/s  back-to-back: 121.76 ms, 333.23 gflop/s
+        #   1.45  1.30  1.33
+        #   432 x 280 x 640   mkl-batch: 183.85 ms  220.7 gflop/s   back-to-back: 149.62 ms  271.19 gflop/s
+        #   1.40  1.35  1.33
+        #   432 x 270 x 640   mkl-batch: 168.62 ms  231.57 gflop/s  back-to-back: 118.31 ms  330.05 gflop/s
+        #   1.40  1.30  1.33
+
+        oversamp = (640/480, 270/208, 448/308)
+        omin = min(oversamp)
+
         import scipy.signal as signal
         from slo.noncart import rolloff3
         ndim  = coord.shape[0]
         npts  = np.prod( coord.shape[1:] )
 
-        oN = tuple([int(oversamp * i) for i in N])
+        oN = list(N)
+        for i in range(3):
+            oN[i] *= oversamp[i]
+        oN = tuple(int(on) for on in oN)
+
         Z = self.Zpad(oN, N, dtype=dtype, name='zpad')
         Mk, S, F, Mx = self.FFTc(oN, dtype=dtype, name='fft')
 
-        beta = np.pi * np.sqrt(((width * 2. / oversamp) * (oversamp - 0.5)) ** 2 - 0.8)
+        beta = np.pi * np.sqrt(((width * 2. / omin) * (omin- 0.5)) ** 2 - 0.8)
         kb = signal.kaiser(2 * n + 1, beta)[n:]
         G = self.Interp(oN, coord, width, kb, dtype=np.float32, name='interp')
 
-        r = rolloff3(oversamp, width, beta, N)
+        r = rolloff3(omin, width, beta, N)
         R = self.Diag(r, name='apod')
 
         return G, Mk, S, F, Mx, Z, R
@@ -445,8 +460,10 @@ class Backend(object):
             self.dtype = A.dtype
 
             # fraction of nonzero rows/columns
+            _cols = np.zeros(A.shape[1], dtype=int)
+            for c in A.indices: _cols[c] = 1
+            self._col_frac = sum(_cols) / A.shape[1]
             self._row_frac = sum(A.indptr[1:]-A.indptr[:-1] > 0) / A.shape[0]
-            self._col_frac = len(set(A.indices))                 / A.shape[1]
             log.debug("matrix %s has %2d%% nonzero rows and %2d%% nonzero columns",
                 name, 100*self._row_frac, 100*self._col_frac)
 
