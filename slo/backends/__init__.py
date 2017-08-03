@@ -29,6 +29,12 @@ def available_backends():
     except Exception as e:
         log.warn("couldn't find CustomCpu backend")
 
+    try:
+        from slo.backends.customgpu import CustomGpuBackend
+        backends.append( CustomGpuBackend )
+    except Exception as e:
+        log.warn("couldn't find CustomGpu backend")
+
     return backends
 
 def get_backend(name):
@@ -44,5 +50,8 @@ def get_backend(name):
     elif name == 'customcpu':
         from slo.backends.customcpu import CustomCpuBackend
         return CustomCpuBackend
+    elif name == 'customgpu':
+        from slo.backends.customgpu import CustomGpuBackend
+        return CustomGpuBackend
     else:
         log.error("unrecognized backend: %s", name)

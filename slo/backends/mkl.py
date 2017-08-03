@@ -343,7 +343,7 @@ class MklBackend(Backend):
     ) -> c_void_p :
         pass
 
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False):
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, exwrite=False):
         transA = create_string_buffer(1)
         if adjoint:
             transA[0] = b'C'

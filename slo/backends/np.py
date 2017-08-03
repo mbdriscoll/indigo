@@ -97,7 +97,7 @@ class NumpyBackend(Backend):
     # -----------------------------------------------------------------------
     # CSRMM Routine
     # -----------------------------------------------------------------------
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False):
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, exwrite=False):
         A = spp.csr_matrix((A_vals._arr, A_indx._arr, A_ptr._arr), shape=A_shape)
         X = x._arr.reshape( x.shape, order='F')
         Y = y._arr.reshape( y.shape, order='F')

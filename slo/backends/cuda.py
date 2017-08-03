@@ -502,7 +502,7 @@ class CudaBackend(Backend):
     ) -> cusparseStatus_t:
         pass
 
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False):
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, exwrite=False):
         m, k = A_shape
         n = x.shape[1]
         ldx = x._leading_dims[0]

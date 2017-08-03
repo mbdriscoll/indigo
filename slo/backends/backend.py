@@ -335,7 +335,7 @@ class Backend(object):
 
         return self.SpMatrix(M, **kwargs)
 
-    def NUFFT(self, M, N, coord, width=3, n=128, oversamp=1.375, dtype=np.dtype('complex64'), **kwargs):
+    def NUFFT(self, M, N, coord, width=3, n=128, oversamp=None, dtype=np.dtype('complex64'), **kwargs):
         assert len(M) == 3
         assert len(N) == 3
         assert M[1:] == coord.shape[1:]
@@ -348,8 +348,11 @@ class Backend(object):
         #   432 x 270 x 640   mkl-batch: 168.62 ms  231.57 gflop/s  back-to-back: 118.31 ms  330.05 gflop/s
         #   1.40  1.30  1.33
 
-        oversamp = (640/480, 270/208, 448/308)
-        omin = min(oversamp)
+        if isinstance(oversamp, tuple):
+            omin = min(oversamp)
+        else:
+            omin = oversamp
+            oversamp = (omin, omin, omin)
 
         import scipy.signal as signal
         from slo.noncart import rolloff3
@@ -432,7 +435,7 @@ class Backend(object):
         return 0
 
     @abc.abstractmethod
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha=1, beta=0, adjoint=False):
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha=1, beta=0, adjoint=False, exwrite=False):
         """
         Computes Y[:] = A * X.
         """
@@ -460,28 +463,29 @@ class Backend(object):
             self.dtype = A.dtype
 
             # fraction of nonzero rows/columns
-            if False:
-                _cols = np.zeros(A.shape[1], dtype=int)
-                for c in A.indices: _cols[c] = 1
-                self._col_frac = sum(_cols) / A.shape[1]
-                self._row_frac = sum(A.indptr[1:]-A.indptr[:-1] > 0) / A.shape[0]
-            else:
-                self._col_frac = 1
-                self._row_frac = 1
+            nnz_per_col = np.zeros(A.shape[1], dtype=int)
+            for c in A.indices: nnz_per_col[c] += 1
+            self._col_frac = 1 - sum(nnz_per_col == 0) / A.shape[1]
+            self._row_frac = sum(A.indptr[1:]-A.indptr[:-1] > 0) / A.shape[0]
             log.debug("matrix %s has %2d%% nonzero rows and %2d%% nonzero columns",
                 name, 100*self._row_frac, 100*self._col_frac)
+
+            # exwrite inspection
+            self._exwrite = np.all(nnz_per_col <= 1)
+            log.debug("matrix %s %s support exwrite", name, "does" if self._exwrite else "doesn't")
+            
 
         def forward(self, y, x, alpha=1, beta=0):
             """ y[:] = A * x """
             self._backend.ccsrmm(y,
                 self.shape, self.colInds, self.rowPtrs, self.values,
-                x, alpha=alpha, beta=beta, adjoint=False)
+                x, alpha=alpha, beta=beta, adjoint=False, exwrite=True)
 
         def adjoint(self, y, x, alpha=1, beta=0):
             """ y[:] = A.H * x """
             self._backend.ccsrmm(y,
                 self.shape, self.colInds, self.rowPtrs, self.values,
-                x, alpha=alpha, beta=beta, adjoint=True)
+                x, alpha=alpha, beta=beta, adjoint=True, exwrite=self._exwrite)
 
         @property
         def nbytes(self):
