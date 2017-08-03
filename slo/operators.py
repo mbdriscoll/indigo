@@ -228,11 +228,15 @@ class UnscaledFFT(Operator):
         nflops = batch * 5 * u*v*w * np.log2(u*v*w)
         nbytes = X.nbytes * 2 + Y.nbytes * 2
 
-        align = 1
-        while X._arr.ctypes.get_data() % align == 0:
-            align *= 2
+        try:
+            align = 1
+            while X._arr.ctypes.get_data() % align == 0:
+                align *= 2
+            align //= 2
+        except AttributeError:
+            align = '?'
 
-        with profile("fft", nflops=nflops, shape=X.shape, aligned=align//2):
+        with profile("fft", nflops=nflops, shape=X.shape, aligned=align):
             if forward:
                 self._backend.fftn(Y, X)
             else:
