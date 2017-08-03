@@ -460,10 +460,14 @@ class Backend(object):
             self.dtype = A.dtype
 
             # fraction of nonzero rows/columns
-            _cols = np.zeros(A.shape[1], dtype=int)
-            for c in A.indices: _cols[c] = 1
-            self._col_frac = sum(_cols) / A.shape[1]
-            self._row_frac = sum(A.indptr[1:]-A.indptr[:-1] > 0) / A.shape[0]
+            if False:
+                _cols = np.zeros(A.shape[1], dtype=int)
+                for c in A.indices: _cols[c] = 1
+                self._col_frac = sum(_cols) / A.shape[1]
+                self._row_frac = sum(A.indptr[1:]-A.indptr[:-1] > 0) / A.shape[0]
+            else:
+                self._col_frac = 1
+                self._row_frac = 1
             log.debug("matrix %s has %2d%% nonzero rows and %2d%% nonzero columns",
                 name, 100*self._row_frac, 100*self._col_frac)
 
