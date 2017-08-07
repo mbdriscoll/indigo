@@ -86,7 +86,9 @@ slc[dim.READ] = slice(None)
 slc[dim.PHS1] = slice(None)
 slc[dim.PHS2] = slice(None)
 
-osf = (640/480, 270/208, 448/308)
+osf = (640/480, 270/208, 448/308) # cpu
+#osf = (600/480, 270/208, 432/308) # gpu
+osf = (600/480, 270/208, 392/308) # gpu
 
 Gs = []
 for t in range(T):

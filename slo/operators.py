@@ -5,6 +5,7 @@ import io, copy
 import itertools
 import numpy as np
 import scipy.sparse as spp
+from ctypes import c_ulong
 
 from slo.util import profile
 
@@ -228,13 +229,19 @@ class UnscaledFFT(Operator):
         nflops = batch * 5 * u*v*w * np.log2(u*v*w)
         nbytes = X.nbytes * 2 + Y.nbytes * 2
 
-        try:
-            align = 1
-            while X._arr.ctypes.get_data() % align == 0:
-                align *= 2
-            align //= 2
-        except AttributeError:
-            align = '?'
+        if isinstance(X._arr, np.ndarray):
+            ptr = X._arr.ctypes.get_data()
+        elif isinstance(X._arr, c_ulong):
+            ptr = X._arr.value
+        else:
+            ptr = 0
+
+        align = 1
+        while ptr % align == 0:
+            align *= 2
+        align //= 2
+
+        print("align", ptr % 256)
 
         with profile("fft", nflops=nflops, shape=X.shape, aligned=align):
             if forward:

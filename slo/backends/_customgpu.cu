@@ -15,13 +15,25 @@ void cu_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
     if (m >= M)
         return;
 
-    for (unsigned int idx = rowPtrs[m]; idx < rowPtrs[m+1]; idx++) {
+    extern __shared__ cuFloatComplex x[];
+
+    unsigned int ptrb = rowPtrs[m],
+                 ptre = rowPtrs[m+1];
+
+    if (ptrb == ptre)
+        return;
+
+    #pragma unroll
+    for (unsigned int n = 0; n < N; n++)
+        x[n] = X[m+n*M];
+
+    for (unsigned int idx = ptrb; idx < ptre; idx++) {
         unsigned int k = colInds[idx];
         cuFloatComplex v = cuCmulf(alpha, cuConjf(values[idx]));
 
         #pragma unroll
         for (unsigned int n = 0; n < N; n++)
-            Y[k+n*K] = cuCmulf(v, X[m+n*M]);
+            Y[k+n*K] = cuCmulf(v, x[n]);
     }
 }
 
@@ -38,5 +50,6 @@ void c_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
     // Y[:] += alpha * AX
     int tpb = 128;
     int nb = (M+tpb-1)/tpb;
-    cu_exw_csrmm_H<<<nb,tpb>>>(M, N, K, alpha, values, colInds, rowPtrs, X, ldx, beta, Y, ldy);
+    int ns = N * sizeof(cuFloatComplex);
+    cu_exw_csrmm_H<<<nb,tpb,ns>>>(M, N, K, alpha, values, colInds, rowPtrs, X, ldx, beta, Y, ldy);
 }
