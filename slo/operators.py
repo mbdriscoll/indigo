@@ -161,7 +161,8 @@ class SpMatrix(Operator):
         if forward:
             nbytes = M.nbytes + x.nbytes*M._col_frac + y.nbytes*2
         else:
-            nbytes = M.nbytes + x.nbytes*M._row_frac + y.nbytes*(2+2*M._col_frac)
+            beta_part = 1 if beta == 0 else 2
+            nbytes = M.nbytes + x.nbytes*M._row_frac + y.nbytes*(beta_part+2*M._col_frac)
         nthreads = self._backend.get_max_threads()
 
         with profile("csrmm", nbytes=nbytes, nthreads=nthreads, shape=x.shape, forward=forward):

@@ -25,8 +25,8 @@ def benchmark_axpy(backend, args):
     nthreads = backend.get_max_threads()
     name = backend.__class__.__name__
 
-    print("axpy, %s, %d threads, %d trials, %2.0f GB, best %2.2f GB/s" % \
-        (name, nthreads, ntrials, nbytes/1e9, gbps), flush=True)
+    print("axpy, %s, %d threads, %d trials, %2.0f GB, best %2.2f ms %2.2f GB/s, worst %2.2f ms %2.2f GB/s" % \
+        (name, nthreads, ntrials, nbytes/1e9, timer.min * 1000, gbps, timer.max * 1000, nbytes/timer.max * 1e-9), flush=True)
 
 
 def benchmark_fft(backend, args):
