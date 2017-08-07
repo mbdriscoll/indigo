@@ -162,7 +162,8 @@ class SpMatrix(Operator):
             nbytes = M.nbytes + x.nbytes*M._col_frac + y.nbytes*2
         else:
             beta_part = 1 if beta == 0 else 2
-            nbytes = M.nbytes + x.nbytes*M._row_frac + y.nbytes*(beta_part+2*M._col_frac)
+            col_part = 1 if M._exwrite else 2
+            nbytes = M.nbytes + x.nbytes*M._row_frac + y.nbytes*(beta_part+col_part*M._col_frac)
         nthreads = self._backend.get_max_threads()
 
         with profile("csrmm", nbytes=nbytes, nthreads=nthreads, shape=x.shape, forward=forward):
@@ -241,8 +242,6 @@ class UnscaledFFT(Operator):
         while ptr % align == 0:
             align *= 2
         align //= 2
-
-        print("align", ptr % 256)
 
         with profile("fft", nflops=nflops, shape=X.shape, aligned=align):
             if forward:

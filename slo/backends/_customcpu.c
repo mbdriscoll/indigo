@@ -115,8 +115,48 @@ py_csrmm(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+static PyObject*
+py_inspect(PyObject *self, PyObject *args)
+{
+    unsigned int M, K;
+    PyArrayObject *py_colInds, *py_rowPtrs;
+
+    if (!PyArg_ParseTuple(args, "iiOO",
+        &M, &K, &py_colInds, &py_rowPtrs))
+        return NULL;
+
+    unsigned int *rowPtrs = PyArray_DATA(py_rowPtrs);
+    unsigned int *colInds = PyArray_DATA(py_colInds);
+
+    int nzrows = 0,
+        nzcols = 0,
+        exwrite = 1;
+    int *nz = malloc(K * sizeof(int)); // nonzeros in each col
+    memset(nz, 0, K * sizeof(int));
+
+    for (unsigned int m = 0; m < M; m++) {
+        unsigned int b = rowPtrs[m+0],
+                     e = rowPtrs[m+1];
+        if (e>b)
+            nzrows += 1;
+        for (unsigned int idx = b; idx < e; idx++)
+            nz[ colInds[idx] ] += 1;
+    }   
+
+    for (unsigned int k = 0; k < K; k++) {
+        if (nz[k] > 0)
+            nzcols += 1;
+        if (nz[k] > 1)
+            exwrite = 0;
+    }
+    free(nz);
+    return Py_BuildValue("iii", nzrows, nzcols, exwrite);
+}
+
+
 static PyMethodDef _customcpuMethods[] = {
     { "csrmm", py_csrmm, METH_VARARGS, NULL },
+    { "inspect", py_inspect, METH_VARARGS, NULL },
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 

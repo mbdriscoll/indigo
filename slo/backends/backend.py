@@ -463,16 +463,14 @@ class Backend(object):
             self.dtype = A.dtype
 
             # fraction of nonzero rows/columns
-            nnz_per_col = np.zeros(A.shape[1], dtype=int)
-            for c in A.indices: nnz_per_col[c] += 1
-            self._col_frac = 1 - sum(nnz_per_col == 0) / A.shape[1]
-            self._row_frac = sum(A.indptr[1:]-A.indptr[:-1] > 0) / A.shape[0]
+            from slo.backends._customcpu import inspect
+            nzrow, nzcol, self._exwrite = inspect(A.shape[0], A.shape[1], A.indices, A.indptr)
+            self._row_frac = nzrow / A.shape[0]
+            self._col_frac = nzcol / A.shape[1]
             log.debug("matrix %s has %2d%% nonzero rows and %2d%% nonzero columns",
                 name, 100*self._row_frac, 100*self._col_frac)
-
-            # exwrite inspection
-            self._exwrite = np.all(nnz_per_col <= 1)
             log.debug("matrix %s %s support exwrite", name, "does" if self._exwrite else "doesn't")
+
             
 
         def forward(self, y, x, alpha=1, beta=0):

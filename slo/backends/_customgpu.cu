@@ -45,7 +45,10 @@ void c_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
     cuFloatComplex *Y, unsigned int ldy)
 {
     // Y[:] *= beta
-    cublasCscal(K*N, beta, Y, 1);
+    if (cuCrealf(beta) == 0 && cuCimagf(beta) == 0)
+        cudaMemset(Y, 0, K*N*sizeof(cuFloatComplex));
+    else
+        cublasCscal(K*N, beta, Y, 1);
 
     // Y[:] += alpha * AX
     int tpb = 128;
