@@ -12,6 +12,7 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
+  - conda install -nroot conda-build=2.1.10
 
   - conda env create -f requirements.txt python=3.5
   - source activate slo
