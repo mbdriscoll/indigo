@@ -13,10 +13,9 @@ install:
   - conda update -q conda
   - conda info -a
 
-  # Replace dep1 dep2 ... with your dependencies
   - conda env create -f requirements.txt python=3.5
   - source activate slo
-  - python setup.py install
+  - conda develop -b .
 
   - export MKLROOT=$CONDA_PREFIX
 
