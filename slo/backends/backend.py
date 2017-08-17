@@ -471,8 +471,6 @@ class Backend(object):
                 name, 100*self._row_frac, 100*self._col_frac)
             log.debug("matrix %s %s support exwrite", name, "does" if self._exwrite else "doesn't")
 
-            
-
         def forward(self, y, x, alpha=1, beta=0):
             """ y[:] = A * x """
             self._backend.ccsrmm(y,
