@@ -6,8 +6,12 @@ import scipy.sparse as spp
 from slo.util import rand64c, randM, Timer
 
 def benchmark_axpy(backend, args):
-    x_d = backend.empty_array( (int(3e9//8),), dtype=np.complex64 )
-    y_d = backend.empty_array( (int(3e9//8),), dtype=np.complex64 )
+    n = 3e9//8
+    n = 2.3e6
+    x = rand64c(int(n))
+    y = rand64c(int(n))
+    x_d = backend.copy_array(x)
+    y_d = backend.copy_array(y)
 
     ntrials = args.trials
     backend.axpy(y_d, 1.1, x_d)
@@ -25,8 +29,8 @@ def benchmark_axpy(backend, args):
     nthreads = backend.get_max_threads()
     name = backend.__class__.__name__
 
-    print("axpy, %s, %d threads, %d trials, %2.0f GB, best %2.2f ms %2.2f GB/s, worst %2.2f ms %2.2f GB/s" % \
-        (name, nthreads, ntrials, nbytes/1e9, timer.min * 1000, gbps, timer.max * 1000, nbytes/timer.max * 1e-9), flush=True)
+    print("axpy, %s, %d threads, %d trials, %.0f MB, best %2.2f ms %2.2f GB/s, worst %2.2f ms %2.2f GB/s" % \
+        (name, nthreads, ntrials, (x_d.nbytes+y_d.nbytes)/1e6, timer.min * 1000, gbps, timer.max * 1000, nbytes/timer.max * 1e-9), flush=True)
 
 
 def benchmark_fft(backend, args):
@@ -185,9 +189,8 @@ def main():
     args = parser.parse_args()
 
     from slo.backends.mkl import MklBackend
-    from slo.backends.cuda import CudaBackend
 
-    Backends = [MklBackend,CudaBackend]
+    Backends = [MklBackend,]
 
     for Backend in Backends:
         backend = Backend()
