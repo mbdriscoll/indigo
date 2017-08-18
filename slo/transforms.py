@@ -74,6 +74,8 @@ class Optimize(Transform):
             log.info("running optimization step: %s" % Step.__name__)
             node = Step().visit(node)
 
+        #SetBatchSizeToOne().visit(node)
+
         # reserve scratch space
         shape = (node.memusage() // node.dtype.itemsize,)
         b = node._backend
@@ -297,3 +299,9 @@ class StoreMatricesInBestOrder(Transform):
         else:
             M = node._matrix
             return SpMatrix( node._backend, M.getH(), name=node._name ).H
+
+
+class SetBatchSizeToOne(Visitor):
+    def visit(self, node):
+        self.generic_visit(node)
+        node._batch = 1
