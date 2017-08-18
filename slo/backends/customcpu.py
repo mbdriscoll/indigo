@@ -18,4 +18,4 @@ class CustomCpuBackend(MklBackend):
         (M, K), N = A_shape, X.shape[1]
         _customcpu.csrmm(adjoint, M, N, K, alpha,
             A_vals._arr, A_indx._arr, A_ptr._arr,
-            X._arr, ldx, beta, Y._arr, ldy)
+            X._arr, ldx, beta, Y._arr, ldy, exwrite)
