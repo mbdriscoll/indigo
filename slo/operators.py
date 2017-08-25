@@ -75,9 +75,9 @@ class Operator(object):
             name='|   ' * indent + name, type=type(self).__name__,
             shape=self.shape, dtype=self.dtype), file=file)
 
-    def optimize(self):
+    def optimize(self, recipe=None):
         from slo.transforms import Optimize
-        return Optimize().visit(self)
+        return Optimize(recipe).visit(self)
 
     def memusage(self, ncols=1):
         from slo.analyses import Memusage
@@ -98,6 +98,20 @@ class CompositeOperator(Operator):
         assert len(self._children) == 1
         return self._children[0]
 
+    @property
+    def children(self):
+        return self._children
+
+    @property
+    def left_child(self):
+        assert len(self._children) == 2
+        return self._children[0]
+
+    @property
+    def right_child(self):
+        assert len(self._children) == 2
+        return self._children[1]
+
     def _adopt(self, children):
         self._children = children
 
@@ -105,6 +119,10 @@ class CompositeOperator(Operator):
         s = super()._dump(file, indent)
         for c in self._children:
             c._dump(file, indent+1)
+
+    def realize(self):
+        from slo.transforms import RealizeMatrices
+        return RealizeMatrices().visit(self)
 
 
 class Adjoint(CompositeOperator):
@@ -137,6 +155,8 @@ class SpMatrix(Operator):
         self._matrix = M
         self._matrix_d = None
 
+        self._allow_exwrite = False
+
     @property
     def dtype(self):
         return self._matrix.dtype
@@ -154,6 +174,11 @@ class SpMatrix(Operator):
             M = self._matrix.tocsr()
             M.sort_indices() # cuda requires sorted indictes
             self._matrix_d = self._backend.csr_matrix(self._backend, M, self._name)
+            if not self._allow_exwrite:
+                log.debug("disallowing exwrite for %s" % self._name)
+                self._matrix_d._exwrite = False
+            else:
+                log.debug("allowing exwrite for %s" % self._name)
         return self._matrix_d
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
@@ -373,6 +398,7 @@ class HStack(CompositeOperator):
                 list(zip(heights, names))))
         super()._adopt(children)
 
+
 class Product(CompositeOperator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -414,4 +440,3 @@ class Product(CompositeOperator):
         ncols = min(ncols, self._batch or ncols)
         nrows = self._children[1].shape[0]
         return nrows * ncols * self.dtype.itemsize
-

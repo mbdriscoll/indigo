@@ -22,6 +22,7 @@ parser.add_argument('-i', type=int, default=20, help='number of iterations')
 parser.add_argument('--backend', type=str, default='numpy', choices=['mkl', 'numpy', 'cuda', 'customcpu', 'customgpu'])
 parser.add_argument('--debug', type=int, default=logging.INFO, help='logging level')
 parser.add_argument('--crop', help='crop data before recon: --crop "COIL:2,TIME:4')
+parser.add_argument('-O', '--recipe', type=int, default=3, choices=range(5), help='optimization level')
 parser.add_argument('data', nargs='?', default="scan.h5", help='kspace data in an HDF file')
 args = parser.parse_args()
 
@@ -75,11 +76,7 @@ C = ksp.shape[dim.COIL]
 T = ksp.shape[dim.TIME]
 M = ksp.shape[dim.MAPS]
 assert M == 1, "No support for multiple maps."
-
-Ss = []
-for c in range(C):
-    S_c = B.Diag( mps[:,:,:,c:c+1], name='map%02d' % c )
-    Ss.append(S_c)
+assert T == 1, "No support for multiple timepoints."
 
 slc = [0] * dim.NDIM
 slc[dim.READ] = slice(None)
@@ -90,17 +87,137 @@ osf = (640/480, 270/208, 432/308) # cpu
 #osf = (600/480, 270/208, 392/308) # gpu
 #osf = (600/480, 264/208, 432/308) # knl
 
-Gs = []
-for t in range(T):
-    slc[dim.TIME] = t
-    G_t, Mk, S, F, Mx, Z, R = B.NUFFT(ksp_nc_dims[:3], ksp_c_dims[:3], traj[slc], oversamp=osf, dtype=ksp.dtype)
-    Gs.append( G_t * Mk * S )
+F1= B.NUFFT(ksp_nc_dims[:3], ksp_c_dims[:3], traj[slc], oversamp=osf, dtype=ksp.dtype)
+F = B.KronI(C, F1)
+S = B.VStack([B.Diag(mps[:,:,:,c:c+1]) for c in range(C)], name='maps')
+A = F * S; A._name = 'SENSE1'
 
-S = B.KronI(T, B.VStack([Mx * Z * R * Sc for Sc in Ss], name='maps'))
-F = B.KronI(T*C, F, name='batch_fft')
-G = B.BlockDiag( [B.KronI(C, Gt) for Gt in Gs], name='interp')
-A = G * F * S; A._name = 'SENSE1'
-A = A.optimize()
+
+from slo.transforms import Transform, Visitor
+from slo.operators import Product, UnscaledFFT, SpMatrix, VStack, KronI
+import scipy.sparse as spp
+
+class MriTreeTransformations(Transform):
+    def visit(self, node):
+        # tree transformations
+        node = MakeRightLeaning().visit(node)
+        node = AssocSpMatrices().visit(node)
+        node = DistKroniOverFFT().visit(node)
+        node = MakeRightLeaning().visit(node)
+
+        # realization
+        node = MriRealize().visit(node)
+
+        # special adjoints
+        node = MriGoodAdjoints().visit(node)
+
+        # exwrite
+        node = UseExwriteProperty().visit(node)
+
+        return node
+
+
+class MriGoodAdjoints(Transform):
+    def visit_SpMatrix(self, node):
+        if 'zpad' in node._name:
+            return node.H.realize().H
+        else:
+            return node
+
+class UseExwriteProperty(Transform):
+    def visit_SpMatrix(self, node):
+        node._allow_exwrite = True
+        return node
+
+class MriRealize(Transform):
+    def visit_VStack(self, node):
+        return node.realize()
+
+    def visit_Product(self, node):
+        l, r = node.children
+        if isinstance(r, VStack) and isinstance(l, KronI):
+            return node.realize()
+
+        node = self.generic_visit(node)
+        l, r = node.children
+        if isinstance(r, SpMatrix) and isinstance(l, SpMatrix):
+            return node.realize()
+        else:
+            return node
+
+class TreeHasFFT(Visitor):
+    def visit_UnscaledFFT(self, node):
+        self._hasit = True
+
+    def search(self, node):
+        self._hasit = False
+        super().visit(node)
+        return self._hasit
+
+
+class DistKroniOverFFT(Transform):
+    def visit_KronI(self, node):
+        child = node.child
+        if isinstance(child, Product) and TreeHasFFT().search(node):
+            l, r = child.children
+            kl = l._backend.KronI( node._c, l )
+            kr = r._backend.KronI( node._c, r )
+            return self.visit(kl * kr)
+        else:
+            return node
+
+class AssocSpMatrices(Transform):
+    def visit_Product(self, node):
+        l = self.visit(node.left_child)
+        r = self.visit(node.right_child)
+
+        try:
+            rl = r.left_child
+            rr = r.right_child
+            if isinstance(l, SpMatrix) and not isinstance(rl, UnscaledFFT):
+                return (l*rl) * rr
+        except (AttributeError, AssertionError):
+            pass
+
+        return l*r
+    
+class MakeRightLeaning(Transform):
+    def visit_Product(self, node):
+        l = self.visit(node.left_child)
+        r = self.visit(node.right_child)
+        if isinstance(l, Product):
+            ll = l.left_child
+            lr = l.right_child
+            return self.visit(ll*(lr*r))
+        else:
+            return l*r
+
+class MakeLeftLeaning(Transform):
+    def visit_Product(self, node):
+        l = self.visit(node.left_child)
+        r = self.visit(node.right_child)
+        if isinstance(r, Product):
+            rl = r.left_child
+            rr = r.right_child
+            return self.visit((l*rl)*rr)
+        else:
+            return l*r
+            
+recipe = []
+if args.recipe >= 1:
+    recipe += [
+        MakeRightLeaning,
+        AssocSpMatrices,
+        DistKroniOverFFT,
+        MakeRightLeaning]
+if args.recipe >= 2:
+    recipe += [MriRealize]
+if args.recipe >= 3:
+    recipe += [MriGoodAdjoints]
+if args.recipe >= 4:
+    recipe += [UseExwriteProperty]
+
+A = A.optimize(recipe)
 
 AHA = A.H * A
 AHA._name = 'SENSE'

@@ -60,6 +60,10 @@ class Visitor(object):
 
 
 class Optimize(Transform):
+    def __init__(self, recipe):
+        super(Transform, self).__init__()
+        self._recipe = recipe or []
+
     def visit(self, node):
         steps = [
             #Normalize,
@@ -70,11 +74,9 @@ class Optimize(Transform):
             StoreMatricesInBestOrder,
         ]
 
-        for Step in steps:
+        for Step in self._recipe:
             log.info("running optimization step: %s" % Step.__name__)
             node = Step().visit(node)
-
-        #SetBatchSizeToOne().visit(node)
 
         # reserve scratch space
         shape = (node.memusage() // node.dtype.itemsize,)
@@ -270,9 +272,10 @@ class RealizeMatrices(Transform):
         else:
             return node
 
-    def dont_visit_BlockDiag(self, node):
+    def visit_BlockDiag(self, node):
         """ BlockDiag( SpMatrices ) => SpMatrix """
-        if all(isinstance(c, SpMatrix) for c in node._children):
+        node = self.generic_visit(node)
+        if all(isinstance(c, SpMatrix) for c in node.children):
             name = "{}+".format(node._children[0]._name)
             dtype = node._children[0].dtype
             m = spp.block_diag( [c._matrix for c in node._children], dtype=dtype )
@@ -280,14 +283,26 @@ class RealizeMatrices(Transform):
         else:
             return node
 
-    def dont_visit_KronI(self, node):
+    def visit_KronI(self, node):
         """ KronI(c, SpMatrix) => SpMatrix """
-        C = node._children[0]
-        if isinstance(C, SpMatrix):
-            name = "{}+".format(C._name)
-            I = spp.eye(node._c, dtype=C.dtype)
-            K = spp.kron(I, C._matrix)
+        node = self.generic_visit(node)
+        child = node.child
+        if isinstance(child, SpMatrix):
+            name = "{}+".format(child._name)
+            I = spp.identity(node._c, dtype=child.dtype)
+            K = spp.kron(I, child._matrix)
             return SpMatrix( node._backend, K, name=name )
+        else:
+            return node
+
+    def visit_Adjoint(self, node):
+        """ Adjoint(M) ==> M.H """
+        node = self.generic_visit(node)
+        child = node.child
+        if isinstance(child, SpMatrix):
+            m = child._matrix.getH()
+            name = "{}.H".format(child._name)
+            return SpMatrix( node._backend, m, name=name )
         else:
             return node
 

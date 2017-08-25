@@ -296,7 +296,7 @@ class Backend(object):
         s = np.ones(n, order='F', dtype=dtype) / np.sqrt(n)
         S = self.Diag(s, name='scale')
         F = self.UnscaledFFT(shape, dtype, **kwargs)
-        return S, F
+        return S*F
 
     def FFTc(self, ft_shape, dtype, **kwargs):
         """ Centered, Unitary FFT """
@@ -308,8 +308,8 @@ class Backend(object):
             mod += (idx[i] - c / 2.0) * (c / ft_shape[i])
         mod = np.exp(1j * 2.0 * np.pi * mod).astype(dtype)
         M = self.Diag(mod, name='mod')
-        S, F = self.FFT(ft_shape, dtype=dtype, **kwargs)
-        return M, S, F, M
+        F = self.FFT(ft_shape, dtype=dtype, **kwargs)
+        return M*F*M
 
     def Zpad(self, M, N, dtype=np.dtype('complex64'), **kwargs):
         slc = []
@@ -365,7 +365,7 @@ class Backend(object):
         oN = tuple(int(on) for on in oN)
 
         Z = self.Zpad(oN, N, dtype=dtype, name='zpad')
-        Mk, S, F, Mx = self.FFTc(oN, dtype=dtype, name='fft')
+        F = self.FFTc(oN, dtype=dtype, name='fft')
 
         beta = np.pi * np.sqrt(((width * 2. / omin) * (omin- 0.5)) ** 2 - 0.8)
         kb = signal.kaiser(2 * n + 1, beta)[n:]
@@ -374,7 +374,7 @@ class Backend(object):
         r = rolloff3(omin, width, beta, N)
         R = self.Diag(r, name='apod')
 
-        return G, Mk, S, F, Mx, Z, R
+        return G*F*Z*R
 
     # -----------------------------------------------------------------------
     # BLAS Routines
@@ -469,7 +469,7 @@ class Backend(object):
             self._col_frac = nzcol / A.shape[1]
             log.debug("matrix %s has %2d%% nonzero rows and %2d%% nonzero columns",
                 name, 100*self._row_frac, 100*self._col_frac)
-            log.debug("matrix %s %s support exwrite", name, "does" if self._exwrite else "doesn't")
+            log.debug("matrix %s supports exwrite: %s", name, self._exwrite)
 
         def forward(self, y, x, alpha=1, beta=0):
             """ y[:] = A * x """
