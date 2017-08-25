@@ -527,6 +527,7 @@ class Backend(object):
 
         for it in range(maxiter):
             profile.extra['it'] = it
+            profile.ktime = 0
             with profile("iter"):
                 A.eval(Ap, p)
                 self.axpy(Ap, lamda, p)
@@ -542,6 +543,8 @@ class Backend(object):
 
                 resid = np.sqrt(rr / r0)
                 log.info("iter %d, residual %g", it, resid.real)
+
+                log.info("ktime =%f=" % profile.ktime)
 
                 if resid < tol:
                     log.info("cg reached tolerance")

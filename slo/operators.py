@@ -191,11 +191,12 @@ class SpMatrix(Operator):
             nbytes = M.nbytes + x.nbytes*M._row_frac + y.nbytes*(beta_part+col_part*M._col_frac)
         nthreads = self._backend.get_max_threads()
 
-        with profile("csrmm", nbytes=nbytes, nthreads=nthreads, shape=x.shape, forward=forward):
+        with profile("csrmm", nbytes=nbytes, nthreads=nthreads, shape=x.shape, forward=forward) as p:
             if forward:
                 M.forward(y, x, alpha=alpha, beta=beta)
             else:
                 M.adjoint(y, x, alpha=alpha, beta=beta)
+        profile.ktime += p.duration
 
 
 class DenseMatrix(Operator):
@@ -268,11 +269,12 @@ class UnscaledFFT(Operator):
             align *= 2
         align //= 2
 
-        with profile("fft", nflops=nflops, shape=X.shape, aligned=align):
+        with profile("fft", nflops=nflops, shape=X.shape, aligned=align) as p:
             if forward:
                 self._backend.fftn(Y, X)
             else:
                 self._backend.ifftn(Y, X)
+        profile.ktime += p.duration
 
     def _mem_usage(self, ncols):
         ncols = min(ncols, self._batch or ncols)

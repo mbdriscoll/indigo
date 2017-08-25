@@ -32,6 +32,7 @@ def randM(M, N, density):
 
 class profile(object):
     extra = dict()
+    ktime = 0
 
     def __init__(self, event, **kwargs):
         self._event = event
@@ -43,6 +44,8 @@ class profile(object):
 
         self._backend.barrier()
         self._start = time.time()
+
+        return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         if log.level > logging.DEBUG:
@@ -74,6 +77,8 @@ class profile(object):
 
         msg = "PROFILE(%s)" % ", ".join("%s=%s" % fmt(*kv) for kv in kvs)
         log.debug(msg)
+
+        self.duration = data['duration']
 
 
 class Timer(object):
