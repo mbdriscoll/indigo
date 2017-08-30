@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define MKL_Complex8 complex float
+#include <mkl.h>
+
 #include <omp.h>
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -37,6 +40,12 @@ void custom_ccc_csrmm(
                 }
             }   
         }
+    } else if (N==1 && transA==0) {
+
+        char adj = (transA) ? 'C' : 'N';
+        char *matdescr = "G NC  ";
+        mkl_ccsrmv(&adj, (const int *) &M, (const int *) &K, &alpha, matdescr, val, (const int *) col, (const int *) pntrb, (const int *) pntre, B, &beta, C);
+
     } else if (transA) {
         #pragma omp parallel
         {

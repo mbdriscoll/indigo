@@ -189,9 +189,8 @@ class SpMatrix(Operator):
             beta_part = 1 if beta == 0 else 2
             col_part = 1 if M._exwrite else 2
             nbytes = M.nbytes + x.nbytes*M._row_frac + y.nbytes*(beta_part+col_part*M._col_frac)
-        nthreads = self._backend.get_max_threads()
-
-        with profile("csrmm", nbytes=nbytes, nthreads=nthreads, shape=x.shape, forward=forward) as p:
+        nflops = 5 * len(self._matrix.data) * x.shape[1]
+        with profile("csrmm", nbytes=nbytes, shape=x.shape, forward=forward, nflops=nflops) as p:
             if forward:
                 M.forward(y, x, alpha=alpha, beta=beta)
             else:

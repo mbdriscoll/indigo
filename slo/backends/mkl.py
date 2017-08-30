@@ -343,6 +343,23 @@ class MklBackend(Backend):
     ) -> c_void_p :
         pass
 
+    @wrap
+    def mkl_ccsrmv(
+        transA   : c_char*1,
+        m        : ndpointer(dtype=np.int32,     ndim=0),
+        k        : ndpointer(dtype=np.int32,     ndim=0),
+        alpha    : ndpointer(dtype=np.dtype('complex64'), ndim=1),
+        matdescA : c_char * 6,
+        val      : dndarray,
+        indx     : dndarray,
+        pntrb    : dndarray,
+        pntre    : dndarray,
+        b        : dndarray,
+        beta     : ndpointer(dtype=np.dtype('complex64'), ndim=1),
+        c        : dndarray,
+    ) -> c_void_p :
+        pass
+
     def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, exwrite=False):
         transA = create_string_buffer(1)
         if adjoint:
@@ -366,6 +383,11 @@ class MklBackend(Backend):
         descrA[2] = b'N'
         descrA[3] = b'F'
 
-        self.mkl_ccsrmm(transA, m, n, k, alpha,
-            descrA, A_vals, A_indx, A_ptrb, A_ptre,
-            x, ldx, beta, y, ldy)
+        if n == 1:
+            self.mkl_ccsrmv(transA, m, k, alpha,
+                descrA, A_vals, A_indx, A_ptrb, A_ptre,
+                x, beta, y)
+        else:
+            self.mkl_ccsrmm(transA, m, n, k, alpha,
+                descrA, A_vals, A_indx, A_ptrb, A_ptre,
+                x, ldx, beta, y, ldy)
