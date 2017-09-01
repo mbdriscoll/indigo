@@ -1,6 +1,14 @@
 Indigo implements a collection of routines for constructing and evaluating high-performance linear operators on multicore and accelerator platforms.
 
 ## Installation
+
+### From Python Package Index
+```
+pip install indigo
+```
+
+### From source
+
 1. Install Anaconda or Miniconda.
 2. Download `indigo`.
 ```
