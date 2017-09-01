@@ -31,8 +31,8 @@ logging.basicConfig(level=args.debug)
 log = logging.getLogger("pics")
 
 # instantiate backend
-import slo.backends
-B = slo.backends.get_backend(args.backend)()
+import indigo.backends
+B = indigo.backends.get_backend(args.backend)
 log.info("using backend: %s", type(B).__name__)
 
 # open input file
@@ -93,8 +93,8 @@ S = B.VStack([B.Diag(mps[:,:,:,c:c+1]) for c in range(C)], name='maps')
 A = F * S; A._name = 'SENSE1'
 
 
-from slo.transforms import Transform, Visitor
-from slo.operators import Product, UnscaledFFT, SpMatrix, VStack, KronI
+from indigo.transforms import Transform, Visitor
+from indigo.operators import Product, UnscaledFFT, SpMatrix, VStack, KronI
 import scipy.sparse as spp
 
 class MriTreeTransformations(Transform):

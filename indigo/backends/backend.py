@@ -4,8 +4,8 @@ import numpy as np
 import scipy.sparse as spp
 from contextlib import contextmanager
 
-import slo.operators as op
-from slo.util import profile
+import indigo.operators as op
+from indigo.util import profile
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class Backend(object):
 
         Parameters
         ----------
-        backend : slo.backends.Backend
+        backend : indigo.backends.Backend
             Backend instance.
         shape : tuple
             Array shape, a la numpy.
@@ -330,7 +330,7 @@ class Backend(object):
         npts = np.prod( coord.shape[1:] )
         coord = coord.reshape((ndim,-1), order='F')
 
-        from slo.interp import interp_mat
+        from indigo.interp import interp_mat
         M = interp_mat(npts, N, width, table, coord, 1).astype(dtype)
 
         return self.SpMatrix(M, **kwargs)
@@ -355,7 +355,7 @@ class Backend(object):
             oversamp = (omin, omin, omin)
 
         import scipy.signal as signal
-        from slo.noncart import rolloff3
+        from indigo.noncart import rolloff3
         ndim  = coord.shape[0]
         npts  = np.prod( coord.shape[1:] )
 
@@ -463,7 +463,7 @@ class Backend(object):
             self.dtype = A.dtype
 
             # fraction of nonzero rows/columns
-            from slo.backends._customcpu import inspect
+            from indigo.backends._customcpu import inspect
             nzrow, nzcol, self._exwrite = inspect(A.shape[0], A.shape[1], A.indices, A.indptr)
             self._row_frac = nzrow / A.shape[0]
             self._col_frac = nzcol / A.shape[1]

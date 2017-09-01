@@ -7,7 +7,7 @@ import numpy as np
 import scipy.sparse as spp
 from ctypes import c_ulong
 
-from slo.util import profile
+from indigo.util import profile
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class Operator(object):
         if isinstance(other, Operator):
             return Product(self._backend, self, other)
         elif isinstance(other, np.ndarray):
-            log.warn("using slow evaluation interface")
+            log.warn("using indigow evaluation interface")
             x = other.reshape( (self.shape[1], -1), order='F' )
             x_d = self._backend.copy_array(x)
             y_d = self._backend.zero_array( (self.shape[0],x.shape[1]), dtype=other.dtype )
@@ -76,11 +76,11 @@ class Operator(object):
             shape=self.shape, dtype=self.dtype), file=file)
 
     def optimize(self, recipe=None):
-        from slo.transforms import Optimize
+        from indigo.transforms import Optimize
         return Optimize(recipe).visit(self)
 
     def memusage(self, ncols=1):
-        from slo.analyses import Memusage
+        from indigo.analyses import Memusage
         return Memusage().measure(self, ncols)
 
 
@@ -121,7 +121,7 @@ class CompositeOperator(Operator):
             c._dump(file, indent+1)
 
     def realize(self):
-        from slo.transforms import RealizeMatrices
+        from indigo.transforms import RealizeMatrices
         return RealizeMatrices().visit(self)
 
 
@@ -252,9 +252,8 @@ class UnscaledFFT(Operator):
         X = x.reshape( self._ft_shape + (x.shape[1],) )
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
 
-        u,v,w,batch = X.shape
-        nflops = batch * 5 * u*v*w * np.log2(u*v*w)
-        nbytes = X.nbytes * 2 + Y.nbytes * 2
+        lens, batch = np.prod(X.shape[:-1]), X.shape[-1]
+        nflops = batch * 5 * lens * np.log2(lens)
 
         if isinstance(X._arr, np.ndarray):
             ptr = X._arr.ctypes.get_data()

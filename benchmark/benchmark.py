@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 import scipy.sparse as spp
 
-from slo.util import rand64c, randM, Timer
+from indigo.util import rand64c, randM, Timer
 
 def benchmark_axpy(backend, args):
     n = 3e9//8
@@ -117,7 +117,7 @@ def fft_search(args):
     shape = (308,208,480)
     minosf, maxosf = 1.25, 1.5
 
-    from slo.backends.cuda import CudaBackend
+    from indigo.backends.cuda import CudaBackend
 
     best_flops = None
     best_flops_s = None
@@ -177,7 +177,7 @@ def fft_search(args):
             (args.batch, x, y, z, nflops/nsec/1e9, nsec*1000, best_flops, best_flops_f/1e9, best_flops_s*1000, best_sec, best_sec_s*1000, best_sec_f/1e9), flush=True)
 
 def main():
-    parser = argparse.ArgumentParser(description='benchmark slo')
+    parser = argparse.ArgumentParser(description='benchmark indigo')
     parser.add_argument('--all',   action='store_true')
     parser.add_argument('--axpy',  action='store_true')
     parser.add_argument('--fft',   action='store_true')
@@ -188,7 +188,7 @@ def main():
     parser.add_argument('--stream', type=float, help='Memory bandwidth in GB/sec.')
     args = parser.parse_args()
 
-    from slo.backends.mkl import MklBackend
+    from indigo.backends.mkl import MklBackend
 
     Backends = [MklBackend,]
 

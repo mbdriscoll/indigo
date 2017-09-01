@@ -10,21 +10,16 @@ import scipy.sparse as spp
 
 # problem dimensions
 M, N, K = 100, 200, 4
-USE_CUDA = False
 
 # create data
 x = (np.random.rand(N,K) + 1j*np.random.rand(N,K)).astype(np.complex64)
 m = spp.rand(M, N, density=0.23).astype(np.complex64)
 
-if USE_CUDA:
-    import slo.backends.cuda
-    backend = slo.backends.cuda.CudaBackend()
-    print("using cuda backend")
-else:
-    import slo.backends.mkl
-    backend = slo.backends.mkl.MklBackend()
-    print("using mkl backend")
+# create a backend
+import indigo.backends
+backend = indigo.backends.get_backend('numpy')
 
+# create an operator
 M = backend.SpMatrix(m)
 
 # try automatic-but-slow interface

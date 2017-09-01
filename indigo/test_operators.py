@@ -4,15 +4,15 @@ import scipy.sparse as spp
 import numpy.testing as npt
 from itertools import product
 
-import slo
-from slo.backends import available_backends
+import indigo
+from indigo.backends import available_backends
 BACKENDS = available_backends()
 
 @pytest.mark.parametrize("backend,M,N,K,density,alpha,beta",
     product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
 def test_SpMatrix(backend, M, N, K, density, alpha, beta):
     b = backend()
-    A_h = slo.util.randM(M, N, density)
+    A_h = indigo.util.randM(M, N, density)
     A = b.SpMatrix(A_h)
 
     # forward
@@ -55,8 +55,8 @@ def test_SpMatrix(backend, M, N, K, density, alpha, beta):
     product( BACKENDS, [3,4], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
 def test_Product(backend, L, M, N, K, density, alpha, beta):
     b = backend()
-    A0_h = slo.util.randM(L, M, density)
-    A1_h = slo.util.randM(M, N, density)
+    A0_h = indigo.util.randM(L, M, density)
+    A1_h = indigo.util.randM(M, N, density)
     A0 = b.SpMatrix(A0_h, name='A0')
     A1 = b.SpMatrix(A1_h, name='A1')
     A = A0 * A1
@@ -87,7 +87,7 @@ def test_Product(backend, L, M, N, K, density, alpha, beta):
     product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,1,0.5] ))
 def test_VStack(backend, stack, M, N, K, density, alpha, beta):
     b = backend()
-    mats_h = [slo.util.randM(M,N,density) for i in range(stack)]
+    mats_h = [indigo.util.randM(M,N,density) for i in range(stack)]
     A_h = spp.vstack(mats_h)
 
     mats_d = [b.SpMatrix(m) for m in mats_h]
@@ -119,7 +119,7 @@ def test_VStack(backend, stack, M, N, K, density, alpha, beta):
     product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
 def test_HStack(backend, stack, M, N, K, density, alpha, beta):
     b = backend()
-    mats_h = [slo.util.randM(M,N,density) for i in range(stack)]
+    mats_h = [indigo.util.randM(M,N,density) for i in range(stack)]
     A_h = spp.hstack(mats_h)
 
     mats_d = [b.SpMatrix(m) for m in mats_h]
@@ -151,7 +151,7 @@ def test_HStack(backend, stack, M, N, K, density, alpha, beta):
     product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
 def test_BlockDiag(backend, stack, M, N, K, density, alpha, beta):
     b = backend()
-    mats_h = [slo.util.randM(M,N,density) for i in range(stack)]
+    mats_h = [indigo.util.randM(M,N,density) for i in range(stack)]
     A_h = spp.block_diag(mats_h)
 
     mats_d = [b.SpMatrix(m) for m in mats_h]
@@ -183,7 +183,7 @@ def test_BlockDiag(backend, stack, M, N, K, density, alpha, beta):
     product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
 def test_KronI(backend, stack, M, N, K, density, alpha, beta):
     b = backend()
-    mat_h = slo.util.randM(M,N,density)
+    mat_h = indigo.util.randM(M,N,density)
     A_h = spp.kron( spp.eye(stack), mat_h )
 
     mat_d = b.SpMatrix(mat_h)
@@ -214,7 +214,7 @@ def test_KronI(backend, stack, M, N, K, density, alpha, beta):
 @pytest.mark.parametrize("backend,M,N,K,B",
     product( BACKENDS, [22,23,24], [22,23,24], [22,23,24], [1,2,3,8] )
 )
-def test_UnscaledFFT(backend, M, N, K, B ):
+def test_UnscaledFFT_3d(backend, M, N, K, B ):
     b = backend()
 
     # forward
@@ -239,6 +239,67 @@ def test_UnscaledFFT(backend, M, N, K, B ):
 
     y_exp = np.fft.ifftn( x_h, axes=(0,1,2) ) * (M*N*K)
     y_act = y.to_host().reshape( (M,N,K,B), order='F' )
+    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+
+@pytest.mark.parametrize("backend,M,N,B",
+    product( BACKENDS, [22,23,24], [22,23,24], [1,2,3,8] )
+)
+def test_UnscaledFFT_2d(backend, M, N, B ):
+    b = backend()
+
+    # forward
+    x = b.rand_array( (M*N, B) )
+    y = b.rand_array( (M*N, B) )
+    x_h = x.to_host().reshape( (M,N,B), order='F' )
+
+    A = b.UnscaledFFT( (M,N), dtype=x.dtype )
+
+    A.eval(y, x)
+
+    y_exp = np.fft.fftn( x_h, axes=(0,1) )
+    y_act = y.to_host().reshape( (M,N,B), order='F' )
+    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+
+    # adjoint
+    x = b.rand_array( (M*N, B) )
+    y = b.rand_array( (M*N, B) )
+    x_h = x.to_host().reshape( (M,N,B), order='F' )
+
+    A.H.eval(y, x)
+
+    y_exp = np.fft.ifftn( x_h, axes=(0,1) ) * (M*N)
+    y_act = y.to_host().reshape( (M,N,B), order='F' )
+    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+
+
+@pytest.mark.parametrize("backend,M,B",
+    product( BACKENDS, [22,23,24], [1,2,3,8] )
+)
+def test_UnscaledFFT_1d(backend, M, B ):
+    b = backend()
+
+    # forward
+    x = b.rand_array( (M, B) )
+    y = b.rand_array( (M, B) )
+    x_h = x.to_host().reshape( (M,B), order='F' )
+
+    A = b.UnscaledFFT( (M,), dtype=x.dtype )
+
+    A.eval(y, x)
+
+    y_exp = np.fft.fftn( x_h, axes=(0,) )
+    y_act = y.to_host().reshape( (M,B), order='F' )
+    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+
+    # adjoint
+    x = b.rand_array( (M, B) )
+    y = b.rand_array( (M, B) )
+    x_h = x.to_host().reshape( (M,B), order='F' )
+
+    A.H.eval(y, x)
+
+    y_exp = np.fft.ifftn( x_h, axes=(0,) ) * M
+    y_act = y.to_host().reshape( (M,B), order='F' )
     npt.assert_allclose(y_act, y_exp, rtol=1e-2)
 
 
@@ -362,7 +423,7 @@ def test_interp(backend, batch, x, y, z, ro, tr):
     product( BACKENDS, [1,2,4,8], [3,4],[3,4], [4,5],[3,6] )
 )
 def test_nested_kroni(backend, batch, M, N, c1, c2):
-    A00_h = slo.util.randM(M, N, 0.9)
+    A00_h = indigo.util.randM(M, N, 0.9)
     A0_h = spp.kron( spp.eye(c1), A00_h )
     A_h = spp.kron( spp.eye(c2), A0_h )
 
@@ -398,7 +459,7 @@ def test_nested_kroni(backend, batch, M, N, c1, c2):
     product( BACKENDS, [23,24,45], [45,24,23], [1,8,9,17], [True,False], [0,.5,1], [0,.5,1] ))
 def test_DenseMatrix(backend, M, N, K, forward, alpha, beta):
     b = backend()
-    A_h = slo.util.rand64c(M,N)
+    A_h = indigo.util.rand64c(M,N)
     A = b.DenseMatrix(A_h)
 
     if forward:
@@ -420,7 +481,7 @@ def test_DenseMatrix(backend, M, N, K, forward, alpha, beta):
              [None,1,2,10] ))
 def test_batch(backend, M, N, K, density, alpha, beta, batch):
     b = backend()
-    A_h = slo.util.randM(M, N, density)
+    A_h = indigo.util.randM(M, N, density)
     A = b.SpMatrix(A_h, batch=batch)
 
     # forward

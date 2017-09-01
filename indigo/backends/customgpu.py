@@ -1,8 +1,8 @@
 import numpy as np
 from ctypes import cdll
 
-from slo.backends.cuda import CudaBackend
-from slo.backends import _customgpu
+from indigo.backends.cuda import CudaBackend
+from indigo.backends import _customgpu
 
 class CustomGpuBackend(CudaBackend):
 

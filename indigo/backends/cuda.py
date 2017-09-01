@@ -364,7 +364,7 @@ class CudaBackend(Backend):
     def cufftMakePlanMany(
         plan    : cufftHandle_t,
         rank    : c_int,
-        n       : POINTER(c_int*3),
+        n       : POINTER(c_int),
         inembed : POINTER(c_int), istride: c_int, idist: c_int,
         onembed : POINTER(c_int), ostride: c_int, odist: c_int,
         typ     : cufftType_t,
@@ -396,13 +396,13 @@ class CudaBackend(Backend):
 
     def _get_or_create_plan(self, x_shape):
         if x_shape not in self._plans:
-            N = x_shape[:3][::-1]
-            dims = (c_int*3)(*N)
-            batch = c_int( np.prod(x_shape[3:]) )
+            N = x_shape[:-1][::-1]
+            batch = x_shape[-1]
+            dims = (c_int*len(N))(*N)
             plan = CudaBackend.cufftHandle_t(self)
             ws = c_size_t()
             self.cufftSetAutoAllocation(plan, 0)
-            self.cufftMakePlanMany(plan, 3, byref(dims),
+            self.cufftMakePlanMany(plan, len(dims), dims,
                 None, 0, 0, None, 0, 0, CudaBackend.CUFFT_C2C,
                 batch, byref(ws))
             self._plans[x_shape] = (plan, ws.value)

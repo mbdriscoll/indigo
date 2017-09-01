@@ -6,14 +6,14 @@ from itertools import product
 
 log = logging.getLogger(__name__)
 
-import slo.util
-from slo.backends import available_backends
+import indigo.util
+from indigo.backends import available_backends
 BACKENDS = available_backends()
 
 @pytest.mark.parametrize("backend,n", product( BACKENDS, [4,8,129] ))
 def test_array_init(backend, n):
     b = backend()
-    arr = slo.util.rand64c(n)
+    arr = indigo.util.rand64c(n)
     d_arr = b.copy_array(arr)
     arr2 = d_arr.to_host()
     np.testing.assert_equal(arr, arr2)
@@ -22,7 +22,7 @@ def test_array_init(backend, n):
 @pytest.mark.parametrize("backend,n", product( BACKENDS, [4,8,129] ))
 def test_array_copy_from(backend, n):
     b = backend()
-    arr = slo.util.rand64c(n)
+    arr = indigo.util.rand64c(n)
     d_arr = b.zero_array(arr.shape, arr.dtype)
     d_arr.copy_from(arr)
     arr2 = d_arr.to_host()
@@ -148,7 +148,7 @@ def test_fft(backend, batch, x, y, z):
 def test_csr_matrix(backend, M, N, K, density):
     b = backend()
     c = np.dtype('complex64')
-    A = slo.util.randM(M, N, density)
+    A = indigo.util.randM(M, N, density)
     A_d = b.csr_matrix(b, A)
 
     # forward
@@ -176,7 +176,7 @@ def test_csr_matrix(backend, M, N, K, density):
 def test_op_dump(backend):
     b = backend()
     M, N, K, density = 22, 33, 44, 0.50
-    A0 = slo.util.randM(M, N, density)
+    A0 = indigo.util.randM(M, N, density)
     A = b.KronI( 4, b.SpMatrix(A0, name='Leaf'), name='Branches' )
     B = A.H * A; B._name = 'Trunk'
     tree = B.dump()
@@ -270,9 +270,9 @@ def test_blas_axpy(backend, n, alpha, alpha_i):
 def test_blas_cgemm(backend, m, n, k, alpha, beta, forward):
     b = backend()
 
-    y = slo.util.rand64c(m,n)
-    M = slo.util.rand64c(m,k)
-    x = slo.util.rand64c(k,n)
+    y = indigo.util.rand64c(m,n)
+    M = indigo.util.rand64c(m,k)
+    x = indigo.util.rand64c(k,n)
 
     if not forward:
         x, y = y, x
