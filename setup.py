@@ -30,10 +30,5 @@ setup(
     license = 'BSD',
     url = 'https://mbdriscoll.github.io/indigo/',
     download_url = 'https://github.com/mbdriscoll/indigo/archive/master.zip',
-    install_requires=[
-          'numpy',   'scipy',
-          'numexpr', 'numba',
-          'pytest',
-      ],
     ext_modules = exts,
 )
