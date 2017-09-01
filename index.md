@@ -10,7 +10,17 @@ cd slo
 3. Create a `conda` environment and install `slo`'s dependences.
 ```
 conda env create --file requirements.txt
+
+# with gcc
+conda develop -b .
+
+# with icc
+LDSHARED='icc -shared' CC=icc conda develop -b .
+
+# for the optional customgpu backend (requires nvcc)
+make -C slo/backends
 ```
+
 4. (Optional) Run the test suite.
 ```
 pytest
