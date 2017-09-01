@@ -19,7 +19,7 @@ def test_Realize_Product(backend, L, M, N, K, density):
     A0 = b.SpMatrix(A0_h, name='A0')
     A1 = b.SpMatrix(A1_h, name='A1')
     A = A0 * A1
-    A = A.optimize()
+    A = A.realize()
 
     # forward
     x = b.rand_array((N,K))
