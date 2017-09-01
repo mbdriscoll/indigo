@@ -17,7 +17,7 @@ m = spp.rand(M, N, density=0.23).astype(np.complex64)
 
 # create a backend
 import slo.backends
-backend = slo.backends.get_backend('cuda')
+backend = slo.backends.get_backend('numpy')
 
 # create an operator
 M = backend.SpMatrix(m)

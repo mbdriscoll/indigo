@@ -32,7 +32,7 @@ log = logging.getLogger("pics")
 
 # instantiate backend
 import slo.backends
-B = slo.backends.get_backend(args.backend)()
+B = slo.backends.get_backend(args.backend)
 log.info("using backend: %s", type(B).__name__)
 
 # open input file
