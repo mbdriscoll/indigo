@@ -3,7 +3,7 @@ import numpy as np
 import scipy.sparse as spp
 from contextlib import contextmanager
 
-from slo.transforms import Visitor
+from indigo.transforms import Visitor
 
 log = logging.getLogger(__name__)
 

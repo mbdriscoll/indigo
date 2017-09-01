@@ -4,7 +4,7 @@ import numpy as np
 import scipy.sparse as spp
 from numpy.ctypeslib import ndpointer
 
-from slo.backends.backend import Backend
+from indigo.backends.backend import Backend
 
 class NumpyBackend(Backend):
 

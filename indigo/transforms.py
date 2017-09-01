@@ -6,7 +6,7 @@ import scipy.sparse as spp
 from itertools import repeat, combinations
 from collections import defaultdict
 
-from slo.operators import (
+from indigo.operators import (
     CompositeOperator, Product,
     KronI, BlockDiag,
     VStack, SpMatrix,

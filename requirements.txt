@@ -1,4 +1,4 @@
-name: slo
+name: indigo
 channels:
 - defaults
 - conda-forge

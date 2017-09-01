@@ -16,8 +16,8 @@ x = (np.random.rand(N,K) + 1j*np.random.rand(N,K)).astype(np.complex64)
 m = spp.rand(M, N, density=0.23).astype(np.complex64)
 
 # create a backend
-import slo.backends
-backend = slo.backends.get_backend('numpy')
+import indigo.backends
+backend = indigo.backends.get_backend('numpy')
 
 # create an operator
 M = backend.SpMatrix(m)

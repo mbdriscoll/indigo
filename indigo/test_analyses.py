@@ -4,9 +4,9 @@ import scipy.sparse as spp
 import numpy.testing as npt
 from itertools import product
 
-import slo
-from slo.operators import Product
-from slo.backends import available_backends
+import indigo
+from indigo.operators import Product
+from indigo.backends import available_backends
 BACKENDS = available_backends()
 
 @pytest.mark.parametrize("backend,L,M,N,K,density,b0,b1,b2",
@@ -15,8 +15,8 @@ BACKENDS = available_backends()
 ))
 def test_Memusage_Product(backend, L, M, N, K, density, b0, b1, b2):
     b = backend()
-    A0_h = slo.util.randM(L, M, density)
-    A1_h = slo.util.randM(M, N, density)
+    A0_h = indigo.util.randM(L, M, density)
+    A1_h = indigo.util.randM(M, N, density)
     A0 = b.SpMatrix(A0_h, name='A0', batch=b0)
     A1 = b.SpMatrix(A1_h, name='A1', batch=b1)
     A = Product(b, A0, A1, batch=b2)

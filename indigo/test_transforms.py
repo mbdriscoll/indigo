@@ -4,8 +4,8 @@ import numpy.testing as npt
 import scipy.sparse as spp
 from itertools import product
 
-import slo
-from slo.backends import available_backends
+import indigo
+from indigo.backends import available_backends
 
 BACKENDS = available_backends()
 
@@ -14,8 +14,8 @@ BACKENDS = available_backends()
 )
 def test_Realize_Product(backend, L, M, N, K, density):
     b = backend()
-    A0_h = slo.util.randM(L, M, density)
-    A1_h = slo.util.randM(M, N, density)
+    A0_h = indigo.util.randM(L, M, density)
+    A1_h = indigo.util.randM(M, N, density)
     A0 = b.SpMatrix(A0_h, name='A0')
     A1 = b.SpMatrix(A1_h, name='A1')
     A = A0 * A1
@@ -54,10 +54,10 @@ def test_Realize_Product(backend, L, M, N, K, density):
 )
 def test_StoreMatricesInBestOrder(backend, M, N, K, density):
     b = backend()
-    A_h = slo.util.randM(M, K, density)
+    A_h = indigo.util.randM(M, K, density)
     A = b.SpMatrix(A_h, name='A')
 
-    from slo.transforms import StoreMatricesInBestOrder
+    from indigo.transforms import StoreMatricesInBestOrder
 
     AHH = StoreMatricesInBestOrder().visit(A)
 
