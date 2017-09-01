@@ -8,7 +8,6 @@ class CustomGpuBackend(CudaBackend):
 
     def ccsrmm(self, Y, A_shape, A_indx, A_ptr, A_vals, X, alpha, beta, adjoint=False, exwrite=False):
         if adjoint and exwrite:
-
             (M, K), N = A_shape, X.shape[1]
             ldx = X._leading_dims[0]
             ldy = Y._leading_dims[0]

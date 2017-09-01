@@ -3,13 +3,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define MKL_Complex8 complex float
-#include <mkl.h>
-
 #include <omp.h>
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
+
+extern void mkl_ccsrmv (const char *transa , const int *m , const int *k , const complex float *alpha , const char *matdescra , const complex float *val , const int *indx , const int *pntrb , const int *pntre , const complex float *x , const complex float *beta , complex float *y );
 
 void custom_ccc_csrmm(
     unsigned int transA, unsigned int M, unsigned int N, unsigned int K, complex float alpha,
