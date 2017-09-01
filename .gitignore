@@ -1,6 +1,8 @@
 .*.swp
 __pycache__
 *.pyc
+*.jpg
 cache
 .DS_Store
 scan.h5
+build

@@ -296,7 +296,7 @@ class Backend(object):
         s = np.ones(n, order='F', dtype=dtype) / np.sqrt(n)
         S = self.Diag(s, name='scale')
         F = self.UnscaledFFT(shape, dtype, **kwargs)
-        return S, F
+        return S*F
 
     def FFTc(self, ft_shape, dtype, **kwargs):
         """ Centered, Unitary FFT """
@@ -308,8 +308,8 @@ class Backend(object):
             mod += (idx[i] - c / 2.0) * (c / ft_shape[i])
         mod = np.exp(1j * 2.0 * np.pi * mod).astype(dtype)
         M = self.Diag(mod, name='mod')
-        S, F = self.FFT(ft_shape, dtype=dtype, **kwargs)
-        return M, S, F, M
+        F = self.FFT(ft_shape, dtype=dtype, **kwargs)
+        return M*F*M
 
     def Zpad(self, M, N, dtype=np.dtype('complex64'), **kwargs):
         slc = []
@@ -335,28 +335,46 @@ class Backend(object):
 
         return self.SpMatrix(M, **kwargs)
 
-    def NUFFT(self, M, N, coord, width=3, n=128, oversamp=1.375, dtype=np.dtype('complex64'), **kwargs):
+    def NUFFT(self, M, N, coord, width=3, n=128, oversamp=None, dtype=np.dtype('complex64'), **kwargs):
         assert len(M) == 3
         assert len(N) == 3
         assert M[1:] == coord.shape[1:]
+
+        # target 448 x 270 x 640
+        #   448 x 270 x 640   mkl-batch: 170.83 ms, 237.51 gflop/s  back-to-back: 121.76 ms, 333.23 gflop/s
+        #   1.45  1.30  1.33
+        #   432 x 280 x 640   mkl-batch: 183.85 ms  220.7 gflop/s   back-to-back: 149.62 ms  271.19 gflop/s
+        #   1.40  1.35  1.33
+        #   432 x 270 x 640   mkl-batch: 168.62 ms  231.57 gflop/s  back-to-back: 118.31 ms  330.05 gflop/s
+        #   1.40  1.30  1.33
+
+        if isinstance(oversamp, tuple):
+            omin = min(oversamp)
+        else:
+            omin = oversamp
+            oversamp = (omin, omin, omin)
 
         import scipy.signal as signal
         from slo.noncart import rolloff3
         ndim  = coord.shape[0]
         npts  = np.prod( coord.shape[1:] )
 
-        oN = tuple([int(oversamp * i) for i in N])
+        oN = list(N)
+        for i in range(3):
+            oN[i] *= oversamp[i]
+        oN = tuple(int(on) for on in oN)
+
         Z = self.Zpad(oN, N, dtype=dtype, name='zpad')
-        Mk, S, F, Mx = self.FFTc(oN, dtype=dtype, name='fft')
+        F = self.FFTc(oN, dtype=dtype, name='fft')
 
-        beta = np.pi * np.sqrt(((width * 2. / oversamp) * (oversamp - 0.5)) ** 2 - 0.8)
+        beta = np.pi * np.sqrt(((width * 2. / omin) * (omin- 0.5)) ** 2 - 0.8)
         kb = signal.kaiser(2 * n + 1, beta)[n:]
-        G = self.Interp(oN, coord, width, kb, dtype=dtype, name='interp')
+        G = self.Interp(oN, coord, width, kb, dtype=np.float32, name='interp')
 
-        r = rolloff3(oversamp, width, beta, N)
+        r = rolloff3(omin, width, beta, N)
         R = self.Diag(r, name='apod')
 
-        return G, Mk, S, F, Mx, Z, R
+        return G*F*Z*R
 
     # -----------------------------------------------------------------------
     # BLAS Routines
@@ -417,7 +435,7 @@ class Backend(object):
         return 0
 
     @abc.abstractmethod
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha=1, beta=0, adjoint=False):
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha=1, beta=0, adjoint=False, exwrite=False):
         """
         Computes Y[:] = A * X.
         """
@@ -436,6 +454,7 @@ class Backend(object):
             """
             if not isinstance(A, spp.csr_matrix):
                 A = A.tocsr()
+            A = self._type_correct(A)
             self._backend = backend
             self.rowPtrs = backend.copy_array(A.indptr + self._index_base, name=name+".rowPtrs")
             self.colInds = backend.copy_array(A.indices + self._index_base, name=name+".colInds")
@@ -443,17 +462,26 @@ class Backend(object):
             self.shape = A.shape
             self.dtype = A.dtype
 
+            # fraction of nonzero rows/columns
+            from slo.backends._customcpu import inspect
+            nzrow, nzcol, self._exwrite = inspect(A.shape[0], A.shape[1], A.indices, A.indptr)
+            self._row_frac = nzrow / A.shape[0]
+            self._col_frac = nzcol / A.shape[1]
+            log.debug("matrix %s has %2d%% nonzero rows and %2d%% nonzero columns",
+                name, 100*self._row_frac, 100*self._col_frac)
+            log.debug("matrix %s supports exwrite: %s", name, self._exwrite)
+
         def forward(self, y, x, alpha=1, beta=0):
             """ y[:] = A * x """
             self._backend.ccsrmm(y,
                 self.shape, self.colInds, self.rowPtrs, self.values,
-                x, alpha=alpha, beta=beta, adjoint=False)
+                x, alpha=alpha, beta=beta, adjoint=False, exwrite=True)
 
         def adjoint(self, y, x, alpha=1, beta=0):
             """ y[:] = A.H * x """
             self._backend.ccsrmm(y,
                 self.shape, self.colInds, self.rowPtrs, self.values,
-                x, alpha=alpha, beta=beta, adjoint=True)
+                x, alpha=alpha, beta=beta, adjoint=True, exwrite=self._exwrite)
 
         @property
         def nbytes(self):
@@ -462,6 +490,9 @@ class Backend(object):
         @property
         def nnz(self):
             return self.values.size
+
+        def _type_correct(self, A):
+            return A.astype(np.complex64)
 
     # -----------------------------------------------------------------------
     # Algorithms
@@ -496,6 +527,7 @@ class Backend(object):
 
         for it in range(maxiter):
             profile.extra['it'] = it
+            profile.ktime = 0
             with profile("iter"):
                 A.eval(Ap, p)
                 self.axpy(Ap, lamda, p)
@@ -511,6 +543,8 @@ class Backend(object):
 
                 resid = np.sqrt(rr / r0)
                 log.info("iter %d, residual %g", it, resid.real)
+
+                log.info("ktime =%f=" % profile.ktime)
 
                 if resid < tol:
                     log.info("cg reached tolerance")

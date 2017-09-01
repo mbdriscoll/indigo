@@ -247,8 +247,7 @@ def test_UnscaledFFT(backend, M, N, K, B ):
 )
 def test_UnitaryFFT(backend, M, N, K, B ):
     b = backend()
-    S, F = b.FFT( (M,N,K), dtype=np.dtype('complex64') )
-    A = S * F
+    A = b.FFT( (M,N,K), dtype=np.dtype('complex64') )
 
     x = b.rand_array( (M*N*K, B) )
     y = b.rand_array( (M*N*K, B) )
@@ -268,8 +267,7 @@ def test_CenteredFFT(backend, M, N, K, B ):
     from numpy.fft import fftshift, ifftshift, fftn, ifftn
 
     b = backend()
-    C, S, F, C = b.FFTc( (M,N,K), dtype=np.dtype('complex64') )
-    A = C * S * F * C
+    A = b.FFTc( (M,N,K), dtype=np.dtype('complex64') )
 
     # forward
     ax = (0,1,2)

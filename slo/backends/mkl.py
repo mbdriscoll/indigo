@@ -36,6 +36,8 @@ class MklBackend(Backend):
     # Arrays
     # -----------------------------------------------------------------------
     class dndarray(Backend.dndarray):
+        _align = 64
+
         def _copy_from(self, arr):
             self._arr.flat[:] = arr.flat
 
@@ -48,10 +50,16 @@ class MklBackend(Backend):
             dst.flat[:] = src.flat
 
         def _malloc(self, shape, dtype):
-            return np.ndarray(shape, dtype, order='F')
+            elems = np.prod(shape) + self._align
+            self._arr_orig = arr = np.ndarray(elems, dtype)
+            while arr.ctypes.get_data() % self._align != 0:
+                arr = arr[1:]
+            arr = arr[:np.prod(shape)]
+            arr = np.asfortranarray(arr.reshape(shape))
+            return arr
 
         def _free(self):
-            del self._arr
+            del self._arr_orig
 
         def _zero(self):
             self._arr[:] = 0
@@ -335,7 +343,24 @@ class MklBackend(Backend):
     ) -> c_void_p :
         pass
 
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False):
+    @wrap
+    def mkl_ccsrmv(
+        transA   : c_char*1,
+        m        : ndpointer(dtype=np.int32,     ndim=0),
+        k        : ndpointer(dtype=np.int32,     ndim=0),
+        alpha    : ndpointer(dtype=np.dtype('complex64'), ndim=1),
+        matdescA : c_char * 6,
+        val      : dndarray,
+        indx     : dndarray,
+        pntrb    : dndarray,
+        pntre    : dndarray,
+        b        : dndarray,
+        beta     : ndpointer(dtype=np.dtype('complex64'), ndim=1),
+        c        : dndarray,
+    ) -> c_void_p :
+        pass
+
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, exwrite=False):
         transA = create_string_buffer(1)
         if adjoint:
             transA[0] = b'C'
@@ -358,6 +383,11 @@ class MklBackend(Backend):
         descrA[2] = b'N'
         descrA[3] = b'F'
 
-        self.mkl_ccsrmm(transA, m, n, k, alpha,
-            descrA, A_vals, A_indx, A_ptrb, A_ptre,
-            x, ldx, beta, y, ldy)
+        if n == 1:
+            self.mkl_ccsrmv(transA, m, k, alpha,
+                descrA, A_vals, A_indx, A_ptrb, A_ptre,
+                x, beta, y)
+        else:
+            self.mkl_ccsrmm(transA, m, n, k, alpha,
+                descrA, A_vals, A_indx, A_ptrb, A_ptre,
+                x, ldx, beta, y, ldy)

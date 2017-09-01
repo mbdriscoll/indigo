@@ -147,15 +147,14 @@ def test_fft(backend, batch, x, y, z):
 )
 def test_csr_matrix(backend, M, N, K, density):
     b = backend()
-    A_r = spp.random(M, N, density=density, format='csr', dtype=np.float32)
-    A_i = spp.random(M, N, density=density, format='csr', dtype=np.float32)
-    A = (A_r + 1j * A_i).astype(np.dtype('complex64'))
+    c = np.dtype('complex64')
+    A = slo.util.randM(M, N, density)
     A_d = b.csr_matrix(b, A)
 
     # forward
     x = (np.random.rand(N,K) + 1j * np.random.rand(N,K))
-    x = np.require(x, dtype=np.dtype('complex64'), requirements='F')
-    y_exp = A * x
+    x = np.require(x, dtype=c, requirements='F')
+    y_exp = A.astype(c) * x
     x_d = b.copy_array(x)
     y_d = b.zero_array(y_exp.shape, x.dtype)
     A_d.forward(y_d, x_d)
@@ -164,8 +163,8 @@ def test_csr_matrix(backend, M, N, K, density):
 
     # adjoint
     x = (np.random.rand(M,K) + 1j * np.random.rand(M,K))
-    x = np.require(x, dtype=np.dtype('complex64'), requirements='C')
-    y_exp = A.H * x
+    x = np.require(x, dtype=c, requirements='C')
+    y_exp = A.H.astype(c) * x
     x_d = b.copy_array(x)
     y_d = b.zero_array(y_exp.shape, x.dtype)
     A_d.adjoint(y_d, x_d)

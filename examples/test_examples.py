@@ -19,5 +19,5 @@ has_pics_py   = os.path.exists("./examples/pics.py")
     reason="requires running pytest from slo root directory")
 def test_pics():
     subprocess.run(
-        "python ./examples/pics.py --crop TIME:2,COIL:4 -i 2 --debug 10 scan.h5",
+        "python ./examples/pics.py --crop TIME:1,COIL:4 -i 2 --debug 10 scan.h5",
         shell=True, check=True)

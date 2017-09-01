@@ -135,12 +135,16 @@ class CudaBackend(Backend):
             self._backend.cudaMemcpy(dst, src, size, kind)
 
         def _malloc(self, shape, dtype):
-            _arr = c_ulong()
-            self._backend.cudaMalloc( byref(_arr), self.nbytes )
-            return _arr
+            align = 256
+            self._fullarr = c_ulong()
+            self._backend.cudaMalloc( byref(self._fullarr), self.nbytes + align)
+            _arr = self._fullarr.value
+            while _arr % align != 0:
+                _arr += 1
+            return c_ulong(_arr)
 
         def _free(self):
-            self._backend.cudaFree( self._arr )
+            self._backend.cudaFree( self._fullarr )
 
         def _zero(self):
             self._backend.cudaMemset( self._arr, 0, self.nbytes )
@@ -502,7 +506,7 @@ class CudaBackend(Backend):
     ) -> cusparseStatus_t:
         pass
 
-    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False):
+    def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, exwrite=False):
         m, k = A_shape
         n = x.shape[1]
         ldx = x._leading_dims[0]

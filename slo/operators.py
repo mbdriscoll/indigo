@@ -5,6 +5,7 @@ import io, copy
 import itertools
 import numpy as np
 import scipy.sparse as spp
+from ctypes import c_ulong
 
 from slo.util import profile
 
@@ -26,9 +27,6 @@ class Operator(object):
            x.shape[1] != y.shape[1]:
             raise ValueError("Dimension mismatch: attemping {} = {} * {} ({}, {})".format(
                 y.shape, (M,N), x.shape, forward, type(self)))
-        if not( x.dtype == self.dtype == y.dtype ):
-            raise ValueError("Dtype mismatch: attemping {} = {} * {}".format(
-                y.dtype, self.dtype, x.dtype))
 
         batch_size = self._batch or x.shape[1]
         for b in range(0, x.shape[1], batch_size):
@@ -77,9 +75,9 @@ class Operator(object):
             name='|   ' * indent + name, type=type(self).__name__,
             shape=self.shape, dtype=self.dtype), file=file)
 
-    def optimize(self):
+    def optimize(self, recipe=None):
         from slo.transforms import Optimize
-        return Optimize().visit(self)
+        return Optimize(recipe).visit(self)
 
     def memusage(self, ncols=1):
         from slo.analyses import Memusage
@@ -100,18 +98,31 @@ class CompositeOperator(Operator):
         assert len(self._children) == 1
         return self._children[0]
 
+    @property
+    def children(self):
+        return self._children
+
+    @property
+    def left_child(self):
+        assert len(self._children) == 2
+        return self._children[0]
+
+    @property
+    def right_child(self):
+        assert len(self._children) == 2
+        return self._children[1]
+
     def _adopt(self, children):
-        dtypes = [child.dtype for child in children]
-        names  = [child._name for child in children]
-        if len(set(dtypes)) > 1:
-            raise ValueError("Operators have inconsistent dtypes: {}".format(
-                set(dtypes)))
         self._children = children
 
     def _dump(self, file, indent=0):
         s = super()._dump(file, indent)
         for c in self._children:
             c._dump(file, indent+1)
+
+    def realize(self):
+        from slo.transforms import RealizeMatrices
+        return RealizeMatrices().visit(self)
 
 
 class Adjoint(CompositeOperator):
@@ -141,9 +152,10 @@ class SpMatrix(Operator):
         """
         super().__init__(backend, **kwargs)
         assert isinstance(M, spp.spmatrix)
-        assert M.dtype == np.dtype('complex64')
         self._matrix = M
         self._matrix_d = None
+
+        self._allow_exwrite = False
 
     @property
     def dtype(self):
@@ -162,25 +174,28 @@ class SpMatrix(Operator):
             M = self._matrix.tocsr()
             M.sort_indices() # cuda requires sorted indictes
             self._matrix_d = self._backend.csr_matrix(self._backend, M, self._name)
+            if not self._allow_exwrite:
+                log.debug("disallowing exwrite for %s" % self._name)
+                self._matrix_d._exwrite = False
+            else:
+                log.debug("allowing exwrite for %s" % self._name)
         return self._matrix_d
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
-        M_d = self._get_or_create_device_matrix()
-        nbytes = M_d.nbytes + x.nbytes + (y.nbytes * (1 if beta == 0 else 2))
-        nthreads = self._backend.get_max_threads()
-
-        if 'interp' in self._name:
-            purpose = 'grid ' + ('forward' if forward else 'adjoint')
-        elif 'map' in self._name:
-            purpose = 'maps ' + ('forward' if forward else 'adjoint')
+        M = self._get_or_create_device_matrix()
+        if forward:
+            nbytes = M.nbytes + x.nbytes*M._col_frac + y.nbytes*2
         else:
-            purpose = '?'
-
-        with profile("csrmm", nbytes=nbytes, nthreads=nthreads, purpose=purpose, shape=x.shape):
+            beta_part = 1 if beta == 0 else 2
+            col_part = 1 if M._exwrite else 2
+            nbytes = M.nbytes + x.nbytes*M._row_frac + y.nbytes*(beta_part+col_part*M._col_frac)
+        nflops = 5 * len(self._matrix.data) * x.shape[1]
+        with profile("csrmm", nbytes=nbytes, shape=x.shape, forward=forward, nflops=nflops) as p:
             if forward:
-                M_d.forward(y, x, alpha=alpha, beta=beta)
+                M.forward(y, x, alpha=alpha, beta=beta)
             else:
-                M_d.adjoint(y, x, alpha=alpha, beta=beta)
+                M.adjoint(y, x, alpha=alpha, beta=beta)
+        profile.ktime += p.duration
 
 
 class DenseMatrix(Operator):
@@ -241,11 +256,24 @@ class UnscaledFFT(Operator):
         nflops = batch * 5 * u*v*w * np.log2(u*v*w)
         nbytes = X.nbytes * 2 + Y.nbytes * 2
 
-        with profile("fft", nflops=nflops, shape=X.shape):
+        if isinstance(X._arr, np.ndarray):
+            ptr = X._arr.ctypes.get_data()
+        elif isinstance(X._arr, c_ulong):
+            ptr = X._arr.value
+        else:
+            ptr = 0
+
+        align = 1
+        while ptr % align == 0:
+            align *= 2
+        align //= 2
+
+        with profile("fft", nflops=nflops, shape=X.shape, aligned=align) as p:
             if forward:
                 self._backend.fftn(Y, X)
             else:
                 self._backend.ifftn(Y, X)
+        profile.ktime += p.duration
 
     def _mem_usage(self, ncols):
         ncols = min(ncols, self._batch or ncols)
@@ -371,6 +399,7 @@ class HStack(CompositeOperator):
                 list(zip(heights, names))))
         super()._adopt(children)
 
+
 class Product(CompositeOperator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -412,4 +441,3 @@ class Product(CompositeOperator):
         ncols = min(ncols, self._batch or ncols)
         nrows = self._children[1].shape[0]
         return nrows * ncols * self.dtype.itemsize
-
