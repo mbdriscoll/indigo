@@ -78,8 +78,7 @@ def test_compat_UnitaryFFT(backend, X,Y,Z, K):
     x = slo.util.rand64c( *shape )
 
     D0 = pymr.linop.FFT(shape, axes=(0,1,2), center=False, dtype=np.dtype('complex64'))
-    S, F = b.FFT(shape[:3], dtype=np.dtype('complex64'))
-    D1 = S * F
+    D1 = b.FFT(shape[:3], dtype=np.dtype('complex64'))
 
     y_exp = D0 * pymr.util.vec(x)
     y_act = D1 * x.reshape((-1,K), order='F')
@@ -98,8 +97,7 @@ def test_compat_CenteredFFT(backend, X,Y,Z, K):
     x = slo.util.rand64c( *shape )
 
     D0 = pymr.linop.FFT(shape, axes=(0,1,2), dtype=np.dtype('complex64'))
-    Mk, S, F, Mx = b.FFTc(shape[:3], dtype=np.dtype('complex64'))
-    D1 = Mk * S * F * Mx
+    D1 = b.FFTc(shape[:3], dtype=np.dtype('complex64'))
 
     y_exp = D0 * pymr.util.vec(x)
     y_act = D1 * x.reshape((-1,K), order='F')
@@ -124,9 +122,7 @@ def test_compat_NUFFT(backend, X, Y, Z, RO, PS, K, oversamp, n, width):
 
     print(nc_dims, c_dims, traj.shape)
     G0 = pymr.linop.NUFFT(nc_dims, c_dims, traj, **kwargs)
-
-    G_t, Mk, S, F, Mx, Z, R = b.NUFFT(nc_dims[:3], c_dims[:3], traj, **kwargs)
-    G1 = G_t * Mk * S * F * Mx * Z * R
+    G1 = b.NUFFT(nc_dims[:3], c_dims[:3], traj, **kwargs)
 
     x_slo = np.asfortranarray(x.reshape((-1,K), order='F'))
     x_pmr = pymr.util.vec(x)
@@ -186,13 +182,10 @@ def test_compat_SENSE(backend, forward, os):
     A_pmr = P * F * S
 
     # slo
-    G, Mk, U, F1, Mx, Z, R = b.NUFFT(ksp.shape[:3], mps.shape[:3], coord[...,0,0], dtype=img.dtype)
-    P1 = b.Diag( dcf, name='dcf' )
-
-    S = b.VStack([ Mx * Z * R * b.Diag(mps[:,:,:,c]) for c in range(C) ])
-    F = b.KronI(C, F1, name='fft')
-    P = b.KronI(C, P1 * G * Mk * U)
-    A_slo = P * F * S
+    P1 = b.KronI(C, b.Diag( dcf, name='dcf' ), name='dcf+')
+    F1 = b.KronI(C, b.NUFFT(ksp.shape[:3], mps.shape[:3], coord[...,0,0], dtype=img.dtype), name='nufft')
+    S1 = b.VStack([b.Diag(mps[:,:,:,c]) for c in range(C)])
+    A_slo = P1 * F1 * S1
 
     # check
     if forward:

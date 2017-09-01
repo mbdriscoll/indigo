@@ -235,30 +235,32 @@ class MklBackend(Backend):
     DFTI_INPLACE = 43
     DFTI_NOT_INPLACE = 44
 
-    def _get_or_create_fft_desc(self, x, axes):
-        assert axes == (0,1,2)
-        key = (x.shape, x.dtype, axes)
+    def _get_or_create_fft_desc(self, x):
+        key = (x.shape, x.dtype)
         if key not in self._fft_descs:
-            N = x.shape[:3][::-1]
-            batch = int(x.size / np.prod(N))
+            dims, batch = x.shape[:-1][::-1], x.shape[-1]
+            ndim = len(dims)
+            if ndim == 1:
+                lengths = c_long(dims[0])
+            else:
+                lengths = (c_long*ndim)(*dims)
             desc = self.DFTI_DESCRIPTOR_HANDLE()
-            lengths = (c_long*3)(*N)
             self.DftiCreateDescriptor( byref(desc),
-                self.DFTI_SINGLE, self.DFTI_COMPLEX, 3, lengths)
+                self.DFTI_SINGLE, self.DFTI_COMPLEX, ndim, lengths )
             self.DftiSetValue( desc, self.DFTI_NUMBER_OF_TRANSFORMS, batch )
             self.DftiSetValue( desc, self.DFTI_PLACEMENT, self.DFTI_NOT_INPLACE )
-            self.DftiSetValue( desc, self.DFTI_INPUT_DISTANCE, np.prod(N) )
-            self.DftiSetValue( desc, self.DFTI_OUTPUT_DISTANCE, np.prod(N) )
+            self.DftiSetValue( desc, self.DFTI_INPUT_DISTANCE, np.prod(dims) )
+            self.DftiSetValue( desc, self.DFTI_OUTPUT_DISTANCE, np.prod(dims) )
             self.DftiCommitDescriptor( desc )
             self._fft_descs[key] = desc
         return self._fft_descs[key]
 
     def fftn(self, y, x):
-        desc = self._get_or_create_fft_desc( x, axes=(0,1,2) )
+        desc = self._get_or_create_fft_desc( x )
         self.DftiComputeForward( desc, x, y )
 
     def ifftn(self, y, x):
-        desc = self._get_or_create_fft_desc( x, axes=(0,1,2) )
+        desc = self._get_or_create_fft_desc( x )
         self.DftiComputeBackward( desc, x, y )
 
     def __del__(self):
@@ -307,7 +309,7 @@ class MklBackend(Backend):
         precision   : c_uint,
         domain      : c_uint,
         dimension   : c_long,
-        length      : c_long*3,
+        #length     : varies. just pass a ctype instance here
     ) -> status_t:
         pass
 

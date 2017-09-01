@@ -86,13 +86,17 @@ class NumpyBackend(Backend):
     def fftn(self, y, x):
         X = x._arr.reshape( x.shape, order='F' )
         Y = y._arr.reshape( y.shape, order='F' )
-        Y[:] = np.fft.fftn(X, axes=(0,1,2))
+        ndim = X.ndim-1
+        axes = tuple(range(ndim))
+        Y[:] = np.fft.fftn(X, axes=axes)
 
     def ifftn(self, y, x):
-        scale = np.prod(x.shape[:3])
         X = x._arr.reshape( x.shape, order='F' )
         Y = y._arr.reshape( y.shape, order='F' )
-        Y[:] = np.fft.ifftn(X, axes=(0,1,2)) * scale
+        ndim = X.ndim-1
+        axes = tuple(range(ndim))
+        scale = np.prod( X.shape[:ndim] )
+        Y[:] = np.fft.ifftn(X, axes=axes) * scale
 
     # -----------------------------------------------------------------------
     # CSRMM Routine

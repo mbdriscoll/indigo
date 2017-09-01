@@ -214,7 +214,7 @@ def test_KronI(backend, stack, M, N, K, density, alpha, beta):
 @pytest.mark.parametrize("backend,M,N,K,B",
     product( BACKENDS, [22,23,24], [22,23,24], [22,23,24], [1,2,3,8] )
 )
-def test_UnscaledFFT(backend, M, N, K, B ):
+def test_UnscaledFFT_3d(backend, M, N, K, B ):
     b = backend()
 
     # forward
@@ -239,6 +239,67 @@ def test_UnscaledFFT(backend, M, N, K, B ):
 
     y_exp = np.fft.ifftn( x_h, axes=(0,1,2) ) * (M*N*K)
     y_act = y.to_host().reshape( (M,N,K,B), order='F' )
+    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+
+@pytest.mark.parametrize("backend,M,N,B",
+    product( BACKENDS, [22,23,24], [22,23,24], [1,2,3,8] )
+)
+def test_UnscaledFFT_2d(backend, M, N, B ):
+    b = backend()
+
+    # forward
+    x = b.rand_array( (M*N, B) )
+    y = b.rand_array( (M*N, B) )
+    x_h = x.to_host().reshape( (M,N,B), order='F' )
+
+    A = b.UnscaledFFT( (M,N), dtype=x.dtype )
+
+    A.eval(y, x)
+
+    y_exp = np.fft.fftn( x_h, axes=(0,1) )
+    y_act = y.to_host().reshape( (M,N,B), order='F' )
+    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+
+    # adjoint
+    x = b.rand_array( (M*N, B) )
+    y = b.rand_array( (M*N, B) )
+    x_h = x.to_host().reshape( (M,N,B), order='F' )
+
+    A.H.eval(y, x)
+
+    y_exp = np.fft.ifftn( x_h, axes=(0,1) ) * (M*N)
+    y_act = y.to_host().reshape( (M,N,B), order='F' )
+    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+
+
+@pytest.mark.parametrize("backend,M,B",
+    product( BACKENDS, [22,23,24], [1,2,3,8] )
+)
+def test_UnscaledFFT_1d(backend, M, B ):
+    b = backend()
+
+    # forward
+    x = b.rand_array( (M, B) )
+    y = b.rand_array( (M, B) )
+    x_h = x.to_host().reshape( (M,B), order='F' )
+
+    A = b.UnscaledFFT( (M,), dtype=x.dtype )
+
+    A.eval(y, x)
+
+    y_exp = np.fft.fftn( x_h, axes=(0,) )
+    y_act = y.to_host().reshape( (M,B), order='F' )
+    npt.assert_allclose(y_act, y_exp, rtol=1e-2)
+
+    # adjoint
+    x = b.rand_array( (M, B) )
+    y = b.rand_array( (M, B) )
+    x_h = x.to_host().reshape( (M,B), order='F' )
+
+    A.H.eval(y, x)
+
+    y_exp = np.fft.ifftn( x_h, axes=(0,) ) * M
+    y_act = y.to_host().reshape( (M,B), order='F' )
     npt.assert_allclose(y_act, y_exp, rtol=1e-2)
 
 

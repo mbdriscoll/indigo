@@ -37,21 +37,24 @@ def available_backends():
 
     return backends
 
-def get_backend(name):
+def get_backend(name, **init):
+    """
+    Instantiates the requested backend.
+    """
     if name == 'mkl':
         from slo.backends.mkl  import MklBackend
-        return MklBackend
+        return MklBackend(**init)
     elif name == 'cuda':
         from slo.backends.cuda import CudaBackend
-        return CudaBackend
+        return CudaBackend(**init)
     elif name == 'numpy':
         from slo.backends.np   import NumpyBackend
-        return NumpyBackend
+        return NumpyBackend(**init)
     elif name == 'customcpu':
         from slo.backends.customcpu import CustomCpuBackend
-        return CustomCpuBackend
+        return CustomCpuBackend(**init)
     elif name == 'customgpu':
         from slo.backends.customgpu import CustomGpuBackend
-        return CustomGpuBackend
+        return CustomGpuBackend(**init)
     else:
         log.error("unrecognized backend: %s", name)

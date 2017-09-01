@@ -252,9 +252,8 @@ class UnscaledFFT(Operator):
         X = x.reshape( self._ft_shape + (x.shape[1],) )
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
 
-        u,v,w,batch = X.shape
-        nflops = batch * 5 * u*v*w * np.log2(u*v*w)
-        nbytes = X.nbytes * 2 + Y.nbytes * 2
+        lens, batch = np.prod(X.shape[:-1]), X.shape[-1]
+        nflops = batch * 5 * lens * np.log2(lens)
 
         if isinstance(X._arr, np.ndarray):
             ptr = X._arr.ctypes.get_data()
