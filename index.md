@@ -13,7 +13,7 @@ pip install indigo
 2. Download `indigo`.
 ```
 git clone git@github.com:mbdriscoll/indigo.git
-cd slo
+cd indigo
 ```
 3. Create a `conda` environment and install `indigo`'s dependences.
 ```
@@ -29,7 +29,7 @@ LDSHARED='icc -shared' CC=icc conda develop -b .
 ```
 For the optional customgpu backend (requires nvcc)
 ```
-make -C slo/backends
+make -C indigo/backends
 ```
 
 4. (Optional) Run the test suite.
