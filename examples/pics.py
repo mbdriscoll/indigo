@@ -97,26 +97,6 @@ from indigo.transforms import Transform, Visitor
 from indigo.operators import Product, UnscaledFFT, SpMatrix, VStack, KronI
 import scipy.sparse as spp
 
-class MriTreeTransformations(Transform):
-    def visit(self, node):
-        # tree transformations
-        node = MakeRightLeaning().visit(node)
-        node = AssocSpMatrices().visit(node)
-        node = DistKroniOverFFT().visit(node)
-        node = MakeRightLeaning().visit(node)
-
-        # realization
-        node = MriRealize().visit(node)
-
-        # special adjoints
-        node = MriGoodAdjoints().visit(node)
-
-        # exwrite
-        node = UseExwriteProperty().visit(node)
-
-        return node
-
-
 class MriGoodAdjoints(Transform):
     def visit_SpMatrix(self, node):
         if 'zpad' in node._name:

@@ -46,7 +46,6 @@ class Operator(object):
         if isinstance(other, Operator):
             return Product(self._backend, self, other)
         elif isinstance(other, np.ndarray):
-            log.warn("using indigow evaluation interface")
             x = other.reshape( (self.shape[1], -1), order='F' )
             x_d = self._backend.copy_array(x)
             y_d = self._backend.zero_array( (self.shape[0],x.shape[1]), dtype=other.dtype )
