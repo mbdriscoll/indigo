@@ -288,3 +288,40 @@ def test_blas_cgemm(backend, m, n, k, alpha, beta, forward):
     y_act = y_d.to_host()
 
     np.testing.assert_allclose(y_exp, y_act, atol=1e-3)
+
+
+
+@pytest.mark.parametrize("backend,m",
+    product(BACKENDS, [10,23,129,144])
+)
+def test_iter_cg(backend, m):
+    b = backend()
+    x = indigo.util.rand64c(m,1)
+    y = indigo.util.rand64c(m,1)
+
+    M = b.Eye(m)
+
+    b.cg(M, y, x, maxiter=2)
+
+
+@pytest.mark.parametrize("backend,m",
+    product(BACKENDS, [10,23,129,144])
+)
+def test_iter_apgd(backend, m):
+    b = backend()
+
+    M = b.Eye(m)
+    x = indigo.util.rand64c(m,1)
+    y = indigo.util.rand64c(m,1)
+
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+
+    def gradf(gf, x_d):
+        M.eval(gf, x_d)
+        b.axpy(gf, -1, y_d)
+
+    def proxg(alpha, x):
+        return x
+
+    b.apgd(gradf, proxg, 1.0, x, maxiter=2)

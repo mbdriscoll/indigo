@@ -41,3 +41,31 @@ def test_Memusage_Product(backend, L, M, N, K, density, b0, b1, b2):
     nbytes_exp = a0_nbytes + a1_nbytes + tmp_nbytes
     nbytes_act = A.H.memusage(ncols=K)
     assert nbytes_exp == nbytes_act
+
+
+@pytest.mark.parametrize("backend", BACKENDS )
+def test_op_has(backend):
+    from indigo.operators import UnscaledFFT, SpMatrix
+
+    b = backend()
+
+    F = b.UnscaledFFT((2,2), dtype=np.complex64)
+    S = b.Eye(4)
+
+    assert     F.has(UnscaledFFT)
+    assert not S.has(UnscaledFFT)
+
+    assert     (F*F).has(UnscaledFFT)
+    assert not (S*S).has(UnscaledFFT)
+
+    assert     (F*S).has(UnscaledFFT)
+    assert     (S*F).has(UnscaledFFT)
+
+    assert not F.has(SpMatrix)
+    assert     S.has(SpMatrix)
+
+    assert not (F*F).has(SpMatrix)
+    assert     (S*S).has(SpMatrix)
+
+    assert     (F*S).has(SpMatrix)
+    assert     (S*F).has(SpMatrix)

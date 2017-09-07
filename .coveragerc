@@ -2,7 +2,10 @@
 include = indigo/*
 omit =
     benchmark/*
-    *NotImplementedError*
     indigo/test_compat.py
     indigo/backends/cuda.py
     indigo/backends/customgpu.py
+    indigo/interp.py
+
+exclude_lines =
+    *NotImplementedError*
