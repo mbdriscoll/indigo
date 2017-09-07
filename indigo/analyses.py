@@ -69,3 +69,18 @@ class Memusage(Visitor):
         data   =  node.nnz * node.dtype.itemsize
         nbytes = data + rowptr + colind
         self._current_mem[0] += nbytes
+
+
+class TreeHasOp(Visitor):
+    def __init__(self, op_classes):
+        self._op_classes = op_classes
+
+    def search(self, node):
+        self._has_it = False
+        self.visit(node)
+        return self._has_it
+
+    def visit(self, node):
+        if isinstance(node, self._op_classes):
+            self._has_it = True
+        self.generic_visit(node)
