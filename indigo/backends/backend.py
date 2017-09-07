@@ -227,7 +227,7 @@ class Backend(object):
         if hasattr(self, '_scratch'):
             pos = self._scratch_pos
             total = self._scratch.size
-            assert pos + size <= total, "Not enough scratch memory."
+            assert pos + size <= total, "Not enough scratch memory (wanted %d MB, but only have %d MB available of %d MB total)." % (size/1e6, (total-pos)/1e6, total/1e6)
             mem = self._scratch[pos:pos+size].reshape(shape)
             self._scratch_pos += size
             yield mem
@@ -527,7 +527,6 @@ class Backend(object):
 
         for it in range(maxiter):
             profile.extra['it'] = it
-            profile.ktime = 0
             with profile("iter"):
                 A.eval(Ap, p)
                 self.axpy(Ap, lamda, p)
@@ -543,8 +542,6 @@ class Backend(object):
 
                 resid = np.sqrt(rr / r0)
                 log.info("iter %d, residual %g", it, resid.real)
-
-                log.info("ktime =%f=" % profile.ktime)
 
                 if resid < tol:
                     log.info("cg reached tolerance")

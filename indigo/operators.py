@@ -82,6 +82,11 @@ class Operator(object):
         from indigo.analyses import Memusage
         return Memusage().measure(self, ncols)
 
+    def has(self, *op_classes):
+        """ True if this operator or any of its children are of the given type(s). """
+        from indigo.analyses import TreeHasOp
+        return TreeHasOp(op_classes).search(self)
+
 
 class CompositeOperator(Operator):
     def __init__(self, backend, *children, **kwargs):
@@ -194,7 +199,6 @@ class SpMatrix(Operator):
                 M.forward(y, x, alpha=alpha, beta=beta)
             else:
                 M.adjoint(y, x, alpha=alpha, beta=beta)
-        profile.ktime += p.duration
 
 
 class DenseMatrix(Operator):
@@ -271,7 +275,6 @@ class UnscaledFFT(Operator):
                 self._backend.fftn(Y, X)
             else:
                 self._backend.ifftn(Y, X)
-        profile.ktime += p.duration
 
     def _mem_usage(self, ncols):
         ncols = min(ncols, self._batch or ncols)

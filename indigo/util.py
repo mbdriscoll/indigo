@@ -32,7 +32,6 @@ def randM(M, N, density):
 
 class profile(object):
     extra = dict()
-    ktime = 0
 
     def __init__(self, event, **kwargs):
         self._event = event

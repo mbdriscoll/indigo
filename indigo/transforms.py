@@ -10,7 +10,7 @@ from indigo.operators import (
     CompositeOperator, Product,
     KronI, BlockDiag,
     VStack, SpMatrix,
-    Adjoint
+    Adjoint, UnscaledFFT,
 )
 
 log = logging.getLogger(__name__)
@@ -320,3 +320,44 @@ class SetBatchSizeToOne(Visitor):
     def visit(self, node):
         self.generic_visit(node)
         node._batch = 1
+
+
+class DistributeKroniOverProd(Transform):
+    """ KronI(A*B) ==> KronI(A) * KronI(B) """
+    def visit_KronI(self, node):
+        child = node.child
+        if isinstance(child, Product):
+            l, r = child.children
+            kl = l._backend.KronI( node._c, l )
+            kr = r._backend.KronI( node._c, r )
+            return self.visit(kl * kr)
+        else:
+            return node
+
+
+class DistributeAdjointOverProd(Transform):
+    """ Adjoint(A*B) ==> Adjoint(B) * Adjoint(A) """
+    def visit_Adjoint(self, node):
+        node = self.generic_visit(node)
+        if isinstance(node.child, Product):
+            l, r = node.child.children
+            return r.H * l.H
+        else:
+            return node
+
+
+class LiftUnscaledFFTs(Transform):
+    def visit_Product(self, node):
+        l = self.visit(node.left_child)
+        r = self.visit(node.right_child)
+        if isinstance(l, Product):
+            ll = l.left_child
+            lr = l.right_child
+            if ll.has(UnscaledFFT):
+                return ll * self.visit(lr*r)
+        if isinstance(r, Product):
+            rl = r.left_child
+            rr = r.right_child
+            if rr.has(UnscaledFFT):
+                return self.visit(l*rl) * rr
+        return l*r
