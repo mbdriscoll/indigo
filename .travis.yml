@@ -16,7 +16,12 @@ install:
 - conda develop -b .
 - export MKLROOT=$CONDA_PREFIX
 - wget -O scan.h5 "https://drive.google.com/uc?export=download&id=0B3gFEmaelkOoZEtvU19reklkamM"
-script: pytest
+
+script:
+- pytest --cov=indigo
+
+after_success:
+  - coveralls
 
 deploy:
   provider: pypi

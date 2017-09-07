@@ -6,3 +6,4 @@ cache
 .DS_Store
 scan.h5
 build
+.coverage*
