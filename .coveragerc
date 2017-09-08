@@ -7,5 +7,6 @@ omit =
     indigo/backends/customgpu.py
     indigo/interp.py
 
+[report]
 exclude_lines =
     *NotImplementedError*
