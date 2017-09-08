@@ -47,25 +47,3 @@ def test_Realize_Product(backend, L, M, N, K, density):
 
     # dtype
     assert A.dtype == np.dtype('complex64')
-
-
-@pytest.mark.parametrize("backend,M,N,K,density",
-    list(product( BACKENDS, [3,4], [5,6], [7,8], [1,0.01,0.1,0.5] ))
-)
-def test_StoreMatricesInBestOrder(backend, M, N, K, density):
-    b = backend()
-    A_h = indigo.util.randM(M, K, density)
-    A = b.SpMatrix(A_h, name='A')
-
-    from indigo.transforms import StoreMatricesInBestOrder
-
-    AHH = StoreMatricesInBestOrder().visit(A)
-
-    x = b.rand_array((K,N))
-    y_act = b.zero_array((M,N), dtype=x.dtype)
-    y_exp = b.zero_array((M,N), dtype=x.dtype)
-
-    A.eval(y_exp, x)
-    AHH.eval(y_act, x)
-
-    npt.assert_allclose( y_exp.to_host(), y_act.to_host(), rtol=1e-4 )

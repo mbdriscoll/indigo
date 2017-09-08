@@ -65,15 +65,6 @@ class Optimize(Transform):
         self._recipe = recipe or []
 
     def visit(self, node):
-        steps = [
-            #Normalize,
-            #TreeTransformations,
-            #OperatorTransformations,
-            RealizeMatrices,
-            #CoalesceAdjoints,
-            StoreMatricesInBestOrder,
-        ]
-
         for Step in self._recipe:
             log.info("running optimization step: %s" % Step.__name__)
             node = Step().visit(node)
