@@ -25,7 +25,7 @@ setup(
     name = 'indigo',
     description = 'Fast linear operators for image reconstruction.',
     packages = ['indigo', 'indigo.backends'],
-    version = '1.0.0',
+    version = '1.0.1',
     author = 'Michael Driscoll',
     author_email = 'mbdriscoll@gmail.com',
     license = 'BSD',
