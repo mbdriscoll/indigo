@@ -334,3 +334,8 @@ def test_get_backend(bname):
 @pytest.mark.xfail
 def test_bad_backend():
     b = get_backend('quantumcomputer')
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_mem_usage(backend):
+    b = backend()
+    b.mem_usage()
