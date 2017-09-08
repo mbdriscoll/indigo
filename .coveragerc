@@ -9,4 +9,4 @@ omit =
 
 [report]
 exclude_lines =
-    *NotImplementedError*
+    NotImplementedError
