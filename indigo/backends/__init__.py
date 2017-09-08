@@ -57,4 +57,4 @@ def get_backend(name, **init):
         from indigo.backends.customgpu import CustomGpuBackend
         return CustomGpuBackend(**init)
     else:
-        log.error("unrecognized backend: %s", name)
+        raise ValueError("unrecognized backend: %s" % name)

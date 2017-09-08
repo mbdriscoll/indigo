@@ -7,7 +7,7 @@ from itertools import product
 log = logging.getLogger(__name__)
 
 import indigo.util
-from indigo.backends import available_backends
+from indigo.backends import available_backends, get_backend
 BACKENDS = available_backends()
 
 @pytest.mark.parametrize("backend,n", product( BACKENDS, [4,8,129] ))
@@ -325,3 +325,17 @@ def test_iter_apgd(backend, m):
         return x
 
     b.apgd(gradf, proxg, 1.0, x, maxiter=2)
+
+
+@pytest.mark.parametrize("bname", ['numpy', 'mkl', 'customcpu'])
+def test_get_backend(bname):
+    b = get_backend(bname)
+
+@pytest.mark.xfail
+def test_bad_backend():
+    b = get_backend('quantumcomputer')
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_mem_usage(backend):
+    b = backend()
+    b.mem_usage()

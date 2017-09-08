@@ -14,21 +14,6 @@ def ftkb(beta, x):
     return ret
 
 
-def rolloff1(oversamp, width, beta, N):
-
-    x = np.mgrid[:N[0]]
-
-    return ftkb(beta, 0.0) / ftkb(beta, (x - N[0] // 2) / N[0] * width * 2.0 / oversamp)
-
-
-def rolloff2(oversamp, width, beta, N):
-
-    x, y = np.mgrid[:N[0], :N[1]]
-
-    return ftkb(beta, 0.0)**2 / (ftkb(beta, (x - N[0] // 2) / N[0] * width * 2.0 / oversamp) *
-                                 ftkb(beta, (y - N[1] // 2) / N[1] * width * 2.0 / oversamp))
-
-
 def rolloff3(oversamp, width, beta, N):
 
     x, y, z = np.mgrid[:N[0], :N[1], :N[2]]
