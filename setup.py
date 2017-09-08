@@ -23,6 +23,7 @@ if os.path.exists( 'indigo/backends/libgpu.a' ):
 
 setup(
     name = 'indigo',
+    description = 'Fast linear operators for image reconstruction.',
     packages = ['indigo', 'indigo.backends'],
     version = '1.0.0',
     author = 'Michael Driscoll',
@@ -30,5 +31,6 @@ setup(
     license = 'BSD',
     url = 'https://mbdriscoll.github.io/indigo/',
     download_url = 'https://github.com/mbdriscoll/indigo/archive/master.zip',
+    bugtrack_url = 'https://github.com/mbdriscoll/indigo/issues', 
     ext_modules = exts,
 )
