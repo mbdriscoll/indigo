@@ -25,7 +25,7 @@ after_success:
 
 deploy:
   provider: pypi
-  server: https://upload.pypi.org
+  server: https://upload.pypi.org/legacy/
   user: indigo-lang
   password:
     secure: tPGwug9HoVlXYWaKqM+5/7tje4IDNhHBCVStEXJTtcijJNOb/lS7H0kXtKlI0JtfTs/JfyLKXuuDNmqBQeFNDDxAgoWTfzracAJql1malF2PX/3NvRbbv+ALwm7OERmSrMmHjM2QC3qhRAvygXBq+/HX/ayXP8lhQm6PV/6LeYlmfUDcRPPtPVwjnL+1o6JGQocu/fD0lTTpOK6eG0kwIfipcuJlNnWGISoRRPTXNDHVnhxH71jGvqoLvUwJ2/+RBpLvDgbT98biye83h/j2aRxegkQk+83WSI48EfJOQidfFjkNnytTWC7G0qSBOw248aHq6u4rfqs2ZB9Jdx/IOBIUb7ZI99aCfy5sWmZUZcjtuJ7Ujra/OOWoL76kWAXrZFgjPScmPdgnBejQwmW2r4JKb9KKIyxNXeBEVvOGGeeu/eidE4lejzwbyx+DMdY0cHSvpb/Z6hBPUzZw2uugcNKw1l7i3FVPdVAQ00jAt61RD9Uu4vZDAELT0mPdMlktmzt4GDWAjtj6lbn85yCyuIdQLkDs90QqLgO7sTcjbi+bWMZD6Nq4ow8GYPy9PoeGA5BAwO47YRRITayZ8LDsd784XxWHBrCvBDzPKK+2nIjgm+wfztSFJVPGwiKlue2dLpdbQroB5qxUt10j5gpo819wy0+F2y6Xrk6uRS1Qls8=
