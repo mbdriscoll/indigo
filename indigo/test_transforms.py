@@ -29,7 +29,7 @@ def test_Realize_Product(backend, L, M, N, K, density):
     x_h = x.to_host()
     y_act = y.to_host()
     y_exp = A0_h @ (A1_h @ x_h)
-    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+    npt.assert_allclose(y_act, y_exp, rtol=1e-3)
 
     # adjoint
     x = b.rand_array((L,K))
@@ -39,7 +39,7 @@ def test_Realize_Product(backend, L, M, N, K, density):
     x_h = x.to_host()
     y_act = y.to_host()
     y_exp = A1_h.H @ (A0_h.H @ x_h)
-    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+    npt.assert_allclose(y_act, y_exp, rtol=1e-3)
 
     # shape
     assert A.shape == (L,N)
