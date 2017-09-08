@@ -267,6 +267,10 @@ class Backend(object):
         M = spp.eye(n, dtype=dtype)
         return self.SpMatrix(M, **kwargs)
 
+    def Adjoint(self, A, **kwargs):
+        """ C := A^H """
+        return op.Adjoint(self, A, **kwargs)
+
     def KronI(self, c, B, **kwargs):
         """ C := I_c (KRON) B """
         return op.KronI(self, c, B, **kwargs)
