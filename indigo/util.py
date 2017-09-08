@@ -78,31 +78,3 @@ class profile(object):
         log.debug(msg)
 
         self.duration = data['duration']
-
-
-class Timer(object):
-    def __init__(self):
-        self._times = []
-
-    def __enter__(self):
-        self._start = time.time()
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self._times.append( time.time() - self._start )
-
-    @property
-    def median(self):
-        return np.median( self._times )
-
-    @property
-    def mean(self):
-        return np.mean( self._times )
-
-    @property
-    def max(self):
-        return np.amax( self._times )
-
-    @property
-    def min(self):
-        return np.amin( self._times )
-

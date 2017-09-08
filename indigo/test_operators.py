@@ -179,6 +179,20 @@ def test_BlockDiag(backend, stack, M, N, K, density, alpha, beta):
     assert A.dtype == np.dtype('complex64')
 
 
+@pytest.mark.parametrize("backend,M,K",
+    product( BACKENDS, [23,45], [45,23] ))
+def test_Eye(backend, M, K):
+    b = backend()
+    A = b.Eye(M)
+    x = b.rand_array((M,K))
+    y = b.rand_array((M,K))
+
+    y_exp = x.to_host()
+    A.eval(y, x)
+
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
+
+
 @pytest.mark.parametrize("backend,stack,M,N,K,density,alpha,beta",
     product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
 def test_KronI(backend, stack, M, N, K, density, alpha, beta):
