@@ -125,20 +125,10 @@ class MriRealize(Transform):
         else:
             return node
 
-class TreeHasFFT(Visitor):
-    def visit_UnscaledFFT(self, node):
-        self._hasit = True
-
-    def search(self, node):
-        self._hasit = False
-        super().visit(node)
-        return self._hasit
-
-
 class DistKroniOverFFT(Transform):
     def visit_KronI(self, node):
         child = node.child
-        if isinstance(child, Product) and TreeHasFFT().search(node):
+        if isinstance(child, Product) and node.has(UnscaledFFT):
             l, r = child.children
             kl = l._backend.KronI( node._c, l )
             kr = r._backend.KronI( node._c, r )
