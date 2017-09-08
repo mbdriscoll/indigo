@@ -94,3 +94,14 @@ def test_DistributeAdjointOverProd(backend):
     assert isinstance(z2, Product)
     assert isinstance(z2.left_child, Adjoint)
     assert isinstance(z2.right_child, Adjoint)
+
+
+@pytest.mark.parametrize("backend", BACKENDS )
+def test_LiftUnscaledFFTs(backend):
+    from indigo.operators import Product, Adjoint
+    from indigo.transforms import LiftUnscaledFFTs
+    b = backend()
+    s = b.Eye(4)
+    f = b.UnscaledFFT((2,2), dtype=s.dtype)
+    z = (f*s)*(s*f)
+    z2 = LiftUnscaledFFTs().visit(z)
