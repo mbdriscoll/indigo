@@ -339,3 +339,16 @@ def test_bad_backend():
 def test_mem_usage(backend):
     b = backend()
     b.mem_usage()
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_dndarray_on_host(backend):
+    b = backend()
+    arr = np.zeros(11, dtype=np.complex64)
+    arr_d = b.copy_array(arr)
+
+    with arr_d.on_host() as arr_h:
+        arr_h += 1
+
+    arr_h2 = arr_d.to_host()
+    assert np.sum(arr_h2) == 11
