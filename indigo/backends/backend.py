@@ -109,6 +109,12 @@ class Backend(object):
             self.copy_to(arr)
             return arr
 
+        @contextmanager
+        def on_host(self):
+            arr_h = self.to_host()
+            yield arr_h
+            self.copy_from(arr_h)
+
         def copy(self, other=None, name=''):
             ''' copy array on device'''
             if other:
@@ -327,6 +333,9 @@ class Backend(object):
         shape = np.prod(M), np.prod(N)
         M = spp.coo_matrix( (ones, (rows,cols)), shape=shape, dtype=dtype )
         return self.SpMatrix(M, **kwargs)
+
+    def Crop(self, M, N, dtype=np.dtype('complex64'), **kwargs):
+        return self.Zpad(N, M, dtype=dtype, **kwargs).H
 
     def Interp(self, N, coord, width, table, dtype=np.dtype('complex64'), **kwargs):
         assert len(N) == 3
