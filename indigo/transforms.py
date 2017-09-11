@@ -89,7 +89,7 @@ class RealizeMatrices(Transform):
         left, right = node._children
         if isinstance(left, SpMatrix) and isinstance(right, SpMatrix):
             name = "{}*{}".format(left._name, right._name)
-            log.debug('computing %s * %s', left._name, right._name)
+            log.debug('realizing product %s * %s', left._name, right._name)
             m = left._matrix @ right._matrix
             return SpMatrix( node._backend, m, name=name )
         else:
@@ -101,7 +101,7 @@ class RealizeMatrices(Transform):
         if all(isinstance(c, SpMatrix) for c in node._children):
             name = "{}+".format(node._children[0]._name)
             dtype = node._children[0].dtype
-            log.debug('stacking %s', ', '.join(c._name for c in node._children))
+            log.debug('realizing vstack %s', ', '.join(c._name for c in node._children))
             m = spp.vstack( [c._matrix for c in node._children], dtype=dtype )
             return SpMatrix( node._backend, m, name=name )
         else:
@@ -113,7 +113,7 @@ class RealizeMatrices(Transform):
         if all(isinstance(c, SpMatrix) for c in node._children):
             name = "{}+".format(node._children[0]._name)
             dtype = node._children[0].dtype
-            log.debug('stacking %s', ', '.join(c._name for c in node._children))
+            log.debug('realizing hstack %s', ', '.join(c._name for c in node._children))
             m = spp.hstack( [c._matrix for c in node._children], dtype=dtype )
             return SpMatrix( node._backend, m, name=name )
         else:
@@ -125,6 +125,7 @@ class RealizeMatrices(Transform):
         if all(isinstance(c, SpMatrix) for c in node.children):
             name = "{}+".format(node._children[0]._name)
             dtype = node._children[0].dtype
+            log.debug('realizing block_diag %s', ', '.join(c._name for c in node._children))
             m = spp.block_diag( [c._matrix for c in node._children], dtype=dtype )
             return SpMatrix( node._backend, m, name=name )
         else:
@@ -137,6 +138,7 @@ class RealizeMatrices(Transform):
         if isinstance(child, SpMatrix):
             name = "{}+".format(child._name)
             I = spp.identity(node._c, dtype=child.dtype)
+            log.debug('realizing kroni %s', child._name)
             K = spp.kron(I, child._matrix)
             return SpMatrix( node._backend, K, name=name )
         else:
@@ -147,6 +149,7 @@ class RealizeMatrices(Transform):
         node = self.generic_visit(node)
         child = node.child
         if isinstance(child, SpMatrix):
+            log.debug('realizing adjoint %s', child._name)
             m = child._matrix.getH()
             name = "{}.H".format(child._name)
             return SpMatrix( node._backend, m, name=name )
@@ -157,9 +160,9 @@ class RealizeMatrices(Transform):
 class DistributeKroniOverProd(Transform):
     """ KronI(A*B) ==> KronI(A) * KronI(B) """
     def visit_KronI(self, node):
-        child = node.child
-        if isinstance(child, Product):
-            l, r = child.children
+        node = self.generic_visit(node)
+        if isinstance(node.child, Product):
+            l, r = node.child.children
             kl = l._backend.KronI( node._c, l )
             kr = r._backend.KronI( node._c, r )
             return self.visit(kl * kr)
