@@ -511,3 +511,14 @@ def test_batch(backend, M, N, K, density, alpha, beta, batch):
     y_exp = beta * y.to_host() + alpha * A_h.H * x.to_host()
     A.H.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
+
+
+@pytest.mark.parametrize("backend,M,N,gamma",
+    product( BACKENDS, [11,12,13], [15,16], [0.0, 0.5, 1.0, 1.5] ))
+def test_Scale(backend, M, N, gamma):
+    B = backend()
+    A = B.Scale(M, gamma)
+    x = indigo.util.rand64c(M,N)
+    y_exp = gamma * x
+    y_act = A * x
+    np.testing.assert_allclose(y_act, y_exp, rtol=1e-5)

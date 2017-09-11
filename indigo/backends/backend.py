@@ -294,6 +294,10 @@ class Backend(object):
         """ A := FFT{ . } """
         return op.UnscaledFFT(self, shape, dtype, **kwargs)
 
+    def Scale(self, n, v, **kwargs):
+        """ C := v * I_n """
+        return op.Scale(self, n, v, **kwargs)
+
     def CopyIn(self, shape, dtype, **kwargs):
         return op.CopyIn(self, shape, dtype)
 

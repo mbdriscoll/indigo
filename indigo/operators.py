@@ -235,20 +235,29 @@ class DenseMatrix(Operator):
             self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward)
 
 
-class UnscaledFFT(Operator):
-    def __init__(self, backend, ft_shape, dtype=np.dtype('complex64'), forward=True, **kwargs):
+class MatrixFreeOperator(Operator):
+    def __init__(self, backend, shape, dtype=np.dtype('complex64'), **kwargs):
         super().__init__(backend, **kwargs)
-        self._ft_shape = ft_shape
         self._dtype = dtype
+        self._shape = shape
 
     @property
     def shape(self):
-        n = np.prod(self._ft_shape)
-        return (n,n)
+        return self._shape
 
     @property
     def dtype(self):
         return self._dtype
+
+    def _mem_usage(self, ncols):
+        return 0
+
+
+class UnscaledFFT(MatrixFreeOperator):
+    def __init__(self, backend, ft_shape, forward=True, **kwargs):
+        self._ft_shape = ft_shape
+        n = np.prod(self._ft_shape)
+        super().__init__(backend, shape=(n,n), **kwargs)
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         assert alpha == 1 and beta == 0
@@ -280,6 +289,18 @@ class UnscaledFFT(Operator):
         ncols = min(ncols, self._batch or ncols)
         ft_shape = self._ft_shape + (ncols,)
         return self._backend._fft_workspace_size(ft_shape)
+
+
+class Scale(MatrixFreeOperator):
+    def __init__(self, backend, n, scalar, **kwargs):
+        self._scalar = scalar
+        super().__init__(backend, shape=(n,n), **kwargs)
+
+    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+        assert beta == 0, "ScaleOp.eval only supports beta == 0"
+        v = alpha * (self._scalar if forward else np.conj(self._scalar))
+        print("scalar", v)
+        self._backend.axpy(y, v, x)
 
 
 class KronI(CompositeOperator):
