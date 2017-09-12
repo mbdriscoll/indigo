@@ -268,11 +268,6 @@ class Backend(object):
         M = spp.diags( v, offsets=0 ).astype(dtype)
         return self.SpMatrix(M, **kwargs)
 
-    def Eye(self, n, dtype=np.dtype('complex64'), **kwargs):
-        """ A := Eye(n) """
-        M = spp.eye(n, dtype=dtype)
-        return self.SpMatrix(M, **kwargs)
-
     def Adjoint(self, A, **kwargs):
         """ C := A^H """
         return op.Adjoint(self, A, **kwargs)
@@ -294,9 +289,9 @@ class Backend(object):
         """ A := FFT{ . } """
         return op.UnscaledFFT(self, shape, dtype, **kwargs)
 
-    def Scale(self, n, v, **kwargs):
-        """ C := v * I_n """
-        return op.Scale(self, n, v, **kwargs)
+    def Eye(self, n, **kwargs):
+        """ A := I_n """
+        return op.Eye(self, n, **kwargs)
 
     def CopyIn(self, shape, dtype, **kwargs):
         return op.CopyIn(self, shape, dtype)
@@ -396,8 +391,8 @@ class Backend(object):
     # -----------------------------------------------------------------------
     # BLAS Routines
     # -----------------------------------------------------------------------
-    def axpy(self, y, alpha, x):
-        """ y += alpha * x """
+    def axpby(self, beta, y, alpha, x):
+        """ y = beta * y + alpha * x """
         raise NotImplementedError()
 
     def dot(self, x, y):
@@ -535,8 +530,8 @@ class Backend(object):
         r = b
         A.eval(Ap, x)
 
-        self.axpy(r, -1, Ap)
-        self.axpy(r, -lamda, x)
+        self.axpby(1, r, -1, Ap)
+        self.axpby(1, r, -lamda, x)
 
         p = r.copy(name='p')
         rr = self.pnorm2(r, team)
@@ -546,15 +541,15 @@ class Backend(object):
             profile.extra['it'] = it
             with profile("iter"):
                 A.eval(Ap, p)
-                self.axpy(Ap, lamda, p)
+                self.axpby(1, Ap, lamda, p)
                 alpha = rr / self.pdot(p, Ap, team)
-                self.axpy(x, alpha, p)
-                self.axpy(r, -alpha, Ap)
+                self.axpby(1, x, alpha, p)
+                self.axpby(1, r, -alpha, Ap)
 
                 r2 = self.pnorm2(r, team)
                 beta = r2 / rr
                 self.scale(p, beta)
-                self.axpy(p, 1, r)
+                self.axpby(1, p, 1, r)
                 rr = r2
 
                 resid = np.sqrt(rr / r0)
@@ -579,30 +574,30 @@ class Backend(object):
         x0 : 1D array, initial solution
         maxiter : int, optional
         '''
-        x = self.copy_array(x_h)
-        z = x.copy()
-        o = x.copy()
-        gf = x.copy()
+        x_k = self.copy_array(x_h)
+        y_k = x_k.copy()
+        y_k1 = x_k.copy()
+        x_k1 = x_k.copy()
 
-        t = 1.0
-        for it in range(maxiter):
-            profile.extra['it'] = it
-            with profile("iter"):
+        gf = x_k.copy()
 
-                o.copy(x)
-                s = t
+        t_k = 1
 
-                gradf(gf, z)
-                self.axpy(x, -alpha, gf)
-                proxg(alpha, x)
+        for it in range(1,maxiter+1):
+            gradf(gf, y_k)
+            self.axpby(1, x_k, -alpha, gf)
 
-                t = (1.0 + (1.0 + 4.0 * t**2)**0.5) / 2.0
+            proxg(x_k, alpha)
 
-                # z = x + (s-1)/t * (x-o)
-                z.copy(x)                # z = x
-                self.axpy(z, (s-1)/t, x) # z += (s-1)/t*x
-                self.axpy(z, (1-s)/t, o) # z += (1-s)/t*o
+            t_k1 = (1.0 + np.sqrt(1.0 + 4.0 * t_k**2)) / 2.0
 
-                r2 = self.pnorm2(gf, team)
-                log.info("iter %d, norm of gradient %g", it, abs(r2))
-        x.copy_to(x_h)
+            t_ratio = (t_k - 1) / t_k1
+            self.axpby(0, y_k1, 1+t_ratio, x_k)
+            self.axpby(1, y_k1,  -t_ratio, x_k1)
+
+            x_k1.copy(x_k)
+            y_k.copy(y_k1)
+
+            log.info("iter %d", it)
+
+        x_k.copy_to(x_h)

@@ -237,10 +237,10 @@ def test_blas_dot(backend, n):
     np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
 
 
-@pytest.mark.parametrize("backend,n,alpha,alpha_i",
-    product(BACKENDS, [10,23,129,144], [-2.1, -1.0, -0.1, 0.0, 0.1, 1.0, 1.2], [0,3])
+@pytest.mark.parametrize("backend,n,alpha,alpha_i,beta",
+    product(BACKENDS, [10,23,129,144], [-2.1, -1.0, -0.1, 0.0, 0.1, 1.0, 1.2], [0,3],[0.0,0.5,1.0,1.5])
 )
-def test_blas_axpy(backend, n, alpha, alpha_i):
+def test_blas_axpby(backend, n, alpha, alpha_i, beta):
     b = backend()
     x = (np.random.rand(n) + 1j * np.random.rand(n))
     y = (np.random.rand(n) + 1j * np.random.rand(n))
@@ -251,8 +251,8 @@ def test_blas_axpy(backend, n, alpha, alpha_i):
 
     alpha = alpha + 1j*alpha_i
 
-    y_exp = y + alpha * x
-    b.axpy(y_d, alpha, x_d)
+    y_exp = beta*y + alpha*x
+    b.axpby(beta, y_d, alpha, x_d)
 
     y_act = y_d.to_host()
 
@@ -319,7 +319,7 @@ def test_iter_apgd(backend, m):
 
     def gradf(gf, x_d):
         M.eval(gf, x_d)
-        b.axpy(gf, -1, y_d)
+        b.axpby(1, gf, -1, y_d)
 
     def proxg(alpha, x):
         return x

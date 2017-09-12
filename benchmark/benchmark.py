@@ -5,7 +5,7 @@ import scipy.sparse as spp
 
 from indigo.util import rand64c, randM, Timer
 
-def benchmark_axpy(backend, args):
+def benchmark_axpby(backend, args):
     n = 3e9//8
     n = 2.3e6
     x = rand64c(int(n))
@@ -14,13 +14,13 @@ def benchmark_axpy(backend, args):
     y_d = backend.copy_array(y)
 
     ntrials = args.trials
-    backend.axpy(y_d, 1.1, x_d)
+    backend.axpby(1, y_d, 1.1, x_d)
 
     backend.barrier()
     timer = Timer()
     for t in range(ntrials):
         with timer:
-            backend.axpy(y_d, 1.1, x_d)
+            backend.axpby(1, y_d, 1.1, x_d)
             backend.barrier()
         
     nsec = timer.min
@@ -29,7 +29,7 @@ def benchmark_axpy(backend, args):
     nthreads = backend.get_max_threads()
     name = backend.__class__.__name__
 
-    print("axpy, %s, %d threads, %d trials, %.0f MB, best %2.2f ms %2.2f GB/s, worst %2.2f ms %2.2f GB/s" % \
+    print("axpby, %s, %d threads, %d trials, %.0f MB, best %2.2f ms %2.2f GB/s, worst %2.2f ms %2.2f GB/s" % \
         (name, nthreads, ntrials, (x_d.nbytes+y_d.nbytes)/1e6, timer.min * 1000, gbps, timer.max * 1000, nbytes/timer.max * 1e-9), flush=True)
 
 
@@ -179,7 +179,7 @@ def fft_search(args):
 def main():
     parser = argparse.ArgumentParser(description='benchmark indigo')
     parser.add_argument('--all',   action='store_true')
-    parser.add_argument('--axpy',  action='store_true')
+    parser.add_argument('--axpby', action='store_true')
     parser.add_argument('--fft',   action='store_true')
     parser.add_argument('--csrmm', action='store_true')
     parser.add_argument('--fftsearch', action='store_true')
@@ -194,7 +194,7 @@ def main():
 
     for Backend in Backends:
         backend = Backend()
-        if args.axpy  or args.all: benchmark_axpy (backend, args)
+        if args.axpby or args.all: benchmark_axpby(backend, args)
         if args.fft   or args.all: benchmark_fft  (backend, args)
         if args.csrmm or args.all: benchmark_csrmm(backend, args)
 

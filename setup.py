@@ -31,6 +31,5 @@ setup(
     license = 'BSD',
     url = 'https://mbdriscoll.github.io/indigo/',
     download_url = 'https://github.com/mbdriscoll/indigo/archive/master.zip',
-    bugtrack_url = 'https://github.com/mbdriscoll/indigo/issues', 
     ext_modules = exts,
 )

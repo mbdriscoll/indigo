@@ -186,10 +186,8 @@ def test_Eye(backend, M, K):
     A = b.Eye(M)
     x = b.rand_array((M,K))
     y = b.rand_array((M,K))
-
     y_exp = x.to_host()
     A.eval(y, x)
-
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
 
@@ -515,10 +513,34 @@ def test_batch(backend, M, N, K, density, alpha, beta, batch):
 
 @pytest.mark.parametrize("backend,M,N,gamma",
     product( BACKENDS, [11,12,13], [15,16], [0.0, 0.5, 1.0, 1.5] ))
-def test_Scale(backend, M, N, gamma):
+def test_Eye_Scale(backend, M, N, gamma):
     B = backend()
-    A = B.Scale(M, gamma)
+    A = gamma * B.Eye(M)
     x = indigo.util.rand64c(M,N)
     y_exp = gamma * x
     y_act = A * x
+    np.testing.assert_allclose(y_act, y_exp, rtol=1e-5)
+
+
+@pytest.mark.parametrize("backend,M,N,gamma",
+    product( BACKENDS, [11,12,13], [15,16], [0.0, 0.5, 1.0, 1.5] ))
+def test_Sum(backend, M, N, gamma):
+    x = indigo.util.rand64c(M,N)
+    B = backend()
+    S = B.Eye(M) * 2
+    E = B.Eye(M) * 4
+    y_exp = (2+4)*x
+    y_act = (S+E) * x
+    np.testing.assert_allclose(y_act, y_exp, rtol=1e-5)
+
+
+@pytest.mark.parametrize("backend,M,N,gamma",
+    product( BACKENDS, [11,12,13], [15,16], [0.0, 0.5, 1.0, 1.5] ))
+def test_Difference(backend, M, N, gamma):
+    x = indigo.util.rand64c(M,N)
+    B = backend()
+    S = B.Eye(M) * 2
+    E = B.Eye(M) * 4
+    y_exp = (2-4)*x
+    y_act = (S-E) * x
     np.testing.assert_allclose(y_act, y_exp, rtol=1e-5)

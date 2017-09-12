@@ -17,7 +17,7 @@ class MklBackend(Backend):
 
     def __init__(self, device_id=0):
         super(MklBackend, self).__init__()
-        log.info('mkl_get_version() reports: %s', self.get_version())
+        log.debug('mkl_get_version() reports: %s', self.get_version())
         self._fft_descs = dict()
 
     def wrap(fn):
@@ -101,12 +101,13 @@ class MklBackend(Backend):
     # -----------------------------------------------------------------------
     # BLAS Routines
     # -----------------------------------------------------------------------
-    def axpy(self, y, alpha, x):
+    def axpby(self, beta, y, alpha, x):
         """ y += alpha * x """
         assert isinstance(x, self.dndarray)
         assert isinstance(y, self.dndarray)
         alpha = np.array(alpha, dtype=np.complex64)
-        self.cblas_caxpy( y.size, alpha, x._arr, 1, y._arr, 1 )
+        beta  = np.array( beta, dtype=np.complex64)
+        self.cblas_caxpby( y.size, alpha, x._arr, 1, beta, y._arr, 1 )
 
     def dot(self, x, y):
         """ returns x^T * y """
@@ -175,11 +176,12 @@ class MklBackend(Backend):
         pass
 
     @wrap
-    def cblas_caxpy(
+    def cblas_caxpby(
         n : c_int,
         a : ndpointer(dtype=np.complex64, ndim=0),
         x : ndpointer(dtype=np.complex64),
         incx : c_int,
+        b : ndpointer(dtype=np.complex64, ndim=0),
         y : ndpointer(dtype=np.complex64),
         incy : c_int,
     ) -> c_void_p:

@@ -205,13 +205,16 @@ class CudaBackend(Backend):
     def cublasDestroy_v2( handle : cublasHandle_t ) -> cublasStatus_t:
         pass
 
-    def axpy(self, y, alpha, x):
+    def axpby(self, beta, y, alpha, x):
         """ y += alpha * x """
         assert isinstance(x, self.dndarray)
         assert isinstance(y, self.dndarray)
         alpha = np.array(alpha, dtype=np.complex64)
-        self.cublasCaxpy_v2( self._cublas_handle,
-            y.size, alpha, x._arr, 1, y._arr, 1 )
+        if beta != 1: # y *= beta
+            beta  = np.array( beta, dtype=np.complex64)
+            self.cublasCscal_v2( self._cublas_handle, y.size,  beta, y._arr, 1 )
+        if alpha != 0:
+            self.cublasCaxpy_v2( self._cublas_handle, y.size, alpha, x._arr, 1, y._arr, 1 )
 
     @wrap(cublas)
     def cublasCaxpy_v2(

@@ -49,8 +49,9 @@ def test_op_has(backend):
 
     b = backend()
 
+    A_h = indigo.util.randM(4, 4, 1)
+    S = b.SpMatrix(A_h)
     F = b.UnscaledFFT((2,2), dtype=np.complex64)
-    S = b.Eye(4)
 
     assert     F.has(UnscaledFFT)
     assert not S.has(UnscaledFFT)

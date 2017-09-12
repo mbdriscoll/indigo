@@ -264,7 +264,7 @@ def test_compat_apgd(backend, M, N, alpha):
     def gradf_indigo(gf, x):
         # gf = AHA*x - AHy
         A_indigo.eval(gf, x)
-        b.axpy(gf, -1, AHy_d)
+        b.axpby(gf, -1, AHy_d)
 
     def proxg_indigo(alpha, x):
         # x = thresh(x)

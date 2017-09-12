@@ -12,7 +12,7 @@ from indigo.util import profile
 log = logging.getLogger(__name__)
 
 class Operator(object):
-    def __init__(self, backend, name='', batch=None):
+    def __init__(self, backend, name='', alpha=1, batch=None):
         self._backend = backend
         self._batch = batch
         self._name = name
@@ -51,9 +51,27 @@ class Operator(object):
             y_d = self._backend.zero_array( (self.shape[0],x.shape[1]), dtype=other.dtype )
             self.eval(y_d, x_d)
             return y_d.to_host()
+        elif isinstance(other, (int, float, complex)):
+            return Scale(self._backend, other, self, dtype=self.dtype)
         else:
             raise ValueError("Cannot multiply Operator by %s" % type(other))
-            
+
+    def __rmul__(self, other):
+        if isinstance(other, (int, float, complex)):
+            return self * other
+        else:
+            raise ValueError("Cannot right-multiply Operator by %s" % type(other))
+
+    def __add__(self, other):
+        if isinstance(other, (int, float, complex)):
+            other = other * self._backend.Eye(self.shape[1])
+        if isinstance(other, Operator):
+            return Sum(self._backend, self, other)
+        else:
+            raise ValueError("Cannot right-add Operator by %s" % type(other))
+
+    def __radd__(self, other):
+        return self + other
 
     @property
     def H(self):
@@ -86,6 +104,24 @@ class Operator(object):
         """ True if this operator or any of its children are of the given type(s). """
         from indigo.analyses import TreeHasOp
         return TreeHasOp(op_classes).search(self)
+
+
+class MatrixFreeOperator(Operator):
+    def __init__(self, backend, shape, dtype=np.dtype('complex64'), **kwargs):
+        super().__init__(backend, **kwargs)
+        self._dtype = dtype
+        self._shape = shape
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    def _mem_usage(self, ncols):
+        return 0
 
 
 class CompositeOperator(Operator):
@@ -235,24 +271,6 @@ class DenseMatrix(Operator):
             self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward)
 
 
-class MatrixFreeOperator(Operator):
-    def __init__(self, backend, shape, dtype=np.dtype('complex64'), **kwargs):
-        super().__init__(backend, **kwargs)
-        self._dtype = dtype
-        self._shape = shape
-
-    @property
-    def shape(self):
-        return self._shape
-
-    @property
-    def dtype(self):
-        return self._dtype
-
-    def _mem_usage(self, ncols):
-        return 0
-
-
 class UnscaledFFT(MatrixFreeOperator):
     def __init__(self, backend, ft_shape, forward=True, **kwargs):
         self._ft_shape = ft_shape
@@ -291,16 +309,12 @@ class UnscaledFFT(MatrixFreeOperator):
         return self._backend._fft_workspace_size(ft_shape)
 
 
-class Scale(MatrixFreeOperator):
-    def __init__(self, backend, n, scalar, **kwargs):
-        self._scalar = scalar
+class Eye(MatrixFreeOperator):
+    def __init__(self, backend, n, **kwargs):
         super().__init__(backend, shape=(n,n), **kwargs)
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
-        assert beta == 0, "ScaleOp.eval only supports beta == 0"
-        v = alpha * (self._scalar if forward else np.conj(self._scalar))
-        print("scalar", v)
-        self._backend.axpy(y, v, x)
+        self._backend.axpby(beta, y, alpha, x)
 
 
 class KronI(CompositeOperator):
@@ -463,3 +477,54 @@ class Product(CompositeOperator):
         ncols = min(ncols, self._batch or ncols)
         nrows = self._children[1].shape[0]
         return nrows * ncols * self.dtype.itemsize
+
+
+class Sum(CompositeOperator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._name = "{}+{}".format(self.left._name, self.right._name)
+
+    @property
+    def left(self):
+        return self._children[0]
+
+    @property
+    def right(self):
+        return self._children[1]
+
+    @property
+    def shape(self):
+        return self.left.shape
+
+    def _adopt(self, children):
+        L, R = children
+        if L.shape != R.shape:
+            raise ValueError("Mismatched shapes in Sum: attempting {} + {} ({} + {})".format(
+                L.shape, R.shape, L._name, R._name))
+        super()._adopt(children)
+
+    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+        L, R = self._children
+        R.eval(y, x, alpha=alpha, beta=beta, forward=forward)
+        L.eval(y, x, alpha=alpha, beta=1.0,  forward=forward)
+
+    def _mem_usage(self, ncols):
+        return 0
+
+
+class Scale(CompositeOperator):
+    def __init__(self, n, v, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._name = "%s*{}".format(self.child._name)
+        self._shape = (n,n)
+        self._val = v
+
+    def shape(self):
+        return self.child.shape
+
+    def dtype(self):
+        return self.child.dtype
+
+    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+        a = alpha * (v if forward else np.conj(v))
+        self.child.eval(y, x, alpha=a, beta=beta, forward=forward)

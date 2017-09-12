@@ -50,11 +50,11 @@ class NumpyBackend(Backend):
     # -----------------------------------------------------------------------
     # BLAS Routines
     # -----------------------------------------------------------------------
-    def axpy(self, y, alpha, x):
-        """ y += alpha * x """
+    def axpby(self, beta, y, alpha, x):
+        """ y = beta*y + alpha*x """
         assert isinstance(x, self.dndarray)
         assert isinstance(y, self.dndarray)
-        y._arr += alpha * x._arr.reshape( y.shape, order='F' )
+        y._arr[:] = beta * y._arr + alpha * x._arr
 
     def dot(self, x, y):
         """ returns x^T * y """
