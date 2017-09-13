@@ -320,11 +320,16 @@ class Backend(object):
         F = self.FFT(ft_shape, dtype=dtype, **kwargs)
         return M*F*M
 
-    def Zpad(self, M, N, dtype=np.dtype('complex64'), **kwargs):
+    def Zpad(self, M, N, mode='center', dtype=np.dtype('complex64'), **kwargs):
         slc = []
-        for m, n in zip(M, N):
-            slc += [slice(m // 2 + int(np.ceil(-n / 2)),
-                          m // 2 + int(np.ceil( n / 2))), ]
+        if mode == 'center':
+            for m, n in zip(M, N):
+                slc += [slice(m // 2 + int(np.ceil(-n / 2)),
+                              m // 2 + int(np.ceil( n / 2))), ]
+        elif mode == 'edge':
+            for m, n in zip(M, N):
+                slc.append(slice(n))
+            pass
         x = np.arange( np.prod(M), dtype=int ).reshape(M, order='F')
         rows = x[slc].flatten(order='F')
         cols = np.arange(rows.size)
