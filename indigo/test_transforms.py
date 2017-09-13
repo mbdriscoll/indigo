@@ -105,3 +105,25 @@ def test_LiftUnscaledFFTs(backend):
     f = b.UnscaledFFT((2,2), dtype=s.dtype)
     z = (f*s)*(s*f)
     z2 = LiftUnscaledFFTs().visit(z)
+
+
+@pytest.mark.parametrize("backend,M",
+    list(product( BACKENDS, [3,4]))
+)
+def test_Realize_Eye(backend, M):
+    from indigo.operators import SpMatrix
+    b = backend()
+    A = b.Eye(M, dtype=np.complex64)
+    A = A.realize()
+    assert isinstance(A, SpMatrix)
+
+
+@pytest.mark.parametrize("backend,M",
+    list(product( BACKENDS, [3,4]))
+)
+def test_Realize_Scale(backend, M):
+    from indigo.operators import SpMatrix
+    b = backend()
+    A = 3 * b.Eye(M, dtype=np.complex64)
+    A = A.realize()
+    assert isinstance(A, SpMatrix)

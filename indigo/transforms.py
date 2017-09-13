@@ -156,6 +156,19 @@ class RealizeMatrices(Transform):
         else:
             return node
 
+    def visit_Eye(self, node):
+        node = self.generic_visit(node)
+        eye = spp.eye(node.shape[0], dtype=node.dtype)
+        return SpMatrix( node._backend, eye, name=node._name )
+
+    def visit_Scale(self, node):
+        node = self.generic_visit(node)
+        if isinstance(node.child, SpMatrix):
+            mat = node.child._matrix * node._val
+            return SpMatrix( node._backend, mat, name=node._name )
+        else:
+            return node
+
 
 class DistributeKroniOverProd(Transform):
     """ KronI(A*B) ==> KronI(A) * KronI(B) """

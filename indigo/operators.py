@@ -52,7 +52,7 @@ class Operator(object):
             self.eval(y_d, x_d)
             return y_d.to_host()
         elif isinstance(other, (int, float, complex)):
-            return Scale(self._backend, other, self, dtype=self.dtype)
+            return Scale(self._backend, other, self)
         else:
             raise ValueError("Cannot multiply Operator by %s" % type(other))
 
@@ -72,6 +72,9 @@ class Operator(object):
 
     def __radd__(self, other):
         return self + other
+
+    def __sub__(self, other):
+        return self + Scale(self._backend, -1, other)
 
     @property
     def H(self):
@@ -104,24 +107,6 @@ class Operator(object):
         """ True if this operator or any of its children are of the given type(s). """
         from indigo.analyses import TreeHasOp
         return TreeHasOp(op_classes).search(self)
-
-
-class MatrixFreeOperator(Operator):
-    def __init__(self, backend, shape, dtype=np.dtype('complex64'), **kwargs):
-        super().__init__(backend, **kwargs)
-        self._dtype = dtype
-        self._shape = shape
-
-    @property
-    def shape(self):
-        return self._shape
-
-    @property
-    def dtype(self):
-        return self._dtype
-
-    def _mem_usage(self, ncols):
-        return 0
 
 
 class CompositeOperator(Operator):
@@ -163,6 +148,24 @@ class CompositeOperator(Operator):
     def realize(self):
         from indigo.transforms import RealizeMatrices
         return RealizeMatrices().visit(self)
+
+
+class MatrixFreeOperator(CompositeOperator):
+    def __init__(self, backend, shape, *args, dtype=np.dtype('complex64'), **kwargs):
+        super().__init__(backend, *args, **kwargs)
+        self._dtype = dtype
+        self._shape = shape
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    def _mem_usage(self, ncols):
+        return 0
 
 
 class Adjoint(CompositeOperator):
@@ -513,18 +516,19 @@ class Sum(CompositeOperator):
 
 
 class Scale(CompositeOperator):
-    def __init__(self, n, v, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._name = "%s*{}".format(self.child._name)
-        self._shape = (n,n)
+    def __init__(self, backend, v, child, **kwargs):
+        super().__init__(backend, child, **kwargs)
+        self._name = "%s*{}".format(child._name)
         self._val = v
 
+    @property
     def shape(self):
         return self.child.shape
 
+    @property
     def dtype(self):
         return self.child.dtype
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
-        a = alpha * (v if forward else np.conj(v))
+        a = alpha * (self._val if forward else np.conj(self._val))
         self.child.eval(y, x, alpha=a, beta=beta, forward=forward)

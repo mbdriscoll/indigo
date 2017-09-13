@@ -183,7 +183,7 @@ def test_BlockDiag(backend, stack, M, N, K, density, alpha, beta):
     product( BACKENDS, [23,45], [45,23] ))
 def test_Eye(backend, M, K):
     b = backend()
-    A = b.Eye(M)
+    A = b.Eye(M, dtype=np.complex64)
     x = b.rand_array((M,K))
     y = b.rand_array((M,K))
     y_exp = x.to_host()
@@ -515,7 +515,7 @@ def test_batch(backend, M, N, K, density, alpha, beta, batch):
     product( BACKENDS, [11,12,13], [15,16], [0.0, 0.5, 1.0, 1.5] ))
 def test_Eye_Scale(backend, M, N, gamma):
     B = backend()
-    A = gamma * B.Eye(M)
+    A = gamma * B.Eye(M, dtype=np.complex64)
     x = indigo.util.rand64c(M,N)
     y_exp = gamma * x
     y_act = A * x
@@ -527,8 +527,8 @@ def test_Eye_Scale(backend, M, N, gamma):
 def test_Sum(backend, M, N, gamma):
     x = indigo.util.rand64c(M,N)
     B = backend()
-    S = B.Eye(M) * 2
-    E = B.Eye(M) * 4
+    S = B.Eye(M, dtype=np.complex64) * 2
+    E = B.Eye(M, dtype=np.complex64) * 4
     y_exp = (2+4)*x
     y_act = (S+E) * x
     np.testing.assert_allclose(y_act, y_exp, rtol=1e-5)
@@ -539,8 +539,8 @@ def test_Sum(backend, M, N, gamma):
 def test_Difference(backend, M, N, gamma):
     x = indigo.util.rand64c(M,N)
     B = backend()
-    S = B.Eye(M) * 2
-    E = B.Eye(M) * 4
+    S = B.Eye(M, dtype=np.complex64) * 2
+    E = B.Eye(M, dtype=np.complex64) * 4
     y_exp = (2-4)*x
     y_act = (S-E) * x
     np.testing.assert_allclose(y_act, y_exp, rtol=1e-5)
