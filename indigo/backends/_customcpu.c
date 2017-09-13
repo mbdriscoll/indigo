@@ -103,6 +103,26 @@ void custom_ccc_csrmm(
     }
 }
 
+
+void custom_onemm(
+    unsigned int M, unsigned int N, unsigned int K,
+    complex float alpha, complex float *X, unsigned int ldx,
+    complex float beta, complex float *Y, unsigned int ldy
+) {
+    // matrix is M-K, X is K-N, Y is M-N
+    // strategy: sum-reduce columns of X, broadcast into columns of Y
+    #pragma omp parallel for
+    for (unsigned int n = 0; n < N; n++) {
+        complex float acc = 0.0f;
+        #pragma unroll
+        for (unsigned int k = 0; k < K; k++)
+            acc += X[k+n*ldx];
+        #pragma unroll
+        for (unsigned int m = 0; m < M; m++)
+            Y[m+n*ldy] = beta * Y[m+n*ldy] + alpha * acc;
+    }
+}
+
 // --------------------------------------------------------------------------
 // Python interface
 // --------------------------------------------------------------------------
@@ -184,8 +204,34 @@ py_inspect(PyObject *self, PyObject *args)
     return Py_BuildValue("iii", nzrows, nzcols, exwrite);
 }
 
+static PyObject*
+py_onemm(PyObject *self, PyObject *args)
+{
+    PyObject *py_alpha, *py_beta;
+    unsigned int ldx, ldy, M, N, K;
+    PyArrayObject *py_Y, *py_X;
+    if (!PyArg_ParseTuple(args, "iiiOOiOOi",
+        &M, &N, &K, &py_alpha, &py_X, &ldx, &py_beta, &py_Y, &ldy))
+        return NULL;
+
+    complex float *X = PyArray_DATA(py_X);
+    complex float *Y = PyArray_DATA(py_Y);
+
+    float alpha_r = (float) PyComplex_RealAsDouble( py_alpha ),
+          alpha_i = (float) PyComplex_ImagAsDouble( py_alpha ),
+           beta_r = (float) PyComplex_RealAsDouble( py_beta  ),
+           beta_i = (float) PyComplex_ImagAsDouble( py_beta  );
+    complex float alpha = alpha_r + I * alpha_i,
+                   beta =  beta_r + I *  beta_i;
+
+    custom_onemm(M, N, K, alpha, X, ldx, beta, Y, ldy);
+
+    Py_RETURN_NONE;
+}
+
 
 static PyMethodDef _customcpuMethods[] = {
+    { "onemm", py_onemm, METH_VARARGS, NULL },
     { "csrmm", py_csrmm, METH_VARARGS, NULL },
     { "inspect", py_inspect, METH_VARARGS, NULL },
     {NULL, NULL, 0, NULL} /* Sentinel */

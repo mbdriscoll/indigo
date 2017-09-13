@@ -532,3 +532,8 @@ class Scale(CompositeOperator):
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         a = alpha * (self._val if forward else np.conj(self._val))
         self.child.eval(y, x, alpha=a, beta=beta, forward=forward)
+
+
+class One(MatrixFreeOperator):
+    def _eval(self, y, x, alpha=1, beta=0, forward=None):
+        self._backend.onemm(y, x, alpha, beta)

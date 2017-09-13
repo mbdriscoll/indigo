@@ -33,8 +33,32 @@ py_exw_csrmm_H(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+static PyObject*
+py_onemm(PyObject *self, PyObject *args)
+{
+    PyObject *py_alpha, *py_beta;
+    unsigned int ldx, ldy, M, N, K;
+    unsigned long Y, X;
+    if (!PyArg_ParseTuple(args, "iiiOkiOki",
+        &M, &N, &K, &py_alpha, &X, &ldx, &py_beta, &Y, &ldy))
+        return NULL;
+
+    float alpha_r = (float) PyComplex_RealAsDouble( py_alpha ),
+          alpha_i = (float) PyComplex_ImagAsDouble( py_alpha ),
+           beta_r = (float) PyComplex_RealAsDouble( py_beta  ),
+           beta_i = (float) PyComplex_ImagAsDouble( py_beta  );
+    complex float alpha = alpha_r + I * alpha_i,
+                   beta =  beta_r + I *  beta_i;
+
+    c_onemm(M, N, K, alpha, (complex float *) X, ldx,
+                     beta,  (complex float *) Y, ldy);
+
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef _customgpuMethods[] = {
     { "exw_csrmm", py_exw_csrmm_H, METH_VARARGS, NULL },
+    { "onemm", py_onemm, METH_VARARGS, NULL },
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 

@@ -395,3 +395,11 @@ class MklBackend(Backend):
             self.mkl_ccsrmm(transA, m, n, k, alpha,
                 descrA, A_vals, A_indx, A_ptrb, A_ptre,
                 x, ldx, beta, y, ldy)
+
+    # -----------------------------------------------------------------------
+    # ONEMM Routines
+    # -----------------------------------------------------------------------
+    def onemm(self, y, x, alpha, beta):
+        log.warn("MKL doesn't implement ONEMM. Using numpy instead.")
+        y._arr[:] = beta * y._arr + alpha * \
+            np.broadcast_to(x._arr.sum(axis=0, keepdims=True), y.shape)

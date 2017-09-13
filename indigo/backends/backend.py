@@ -293,6 +293,10 @@ class Backend(object):
         """ A := I_n """
         return op.Eye(self, n, **kwargs)
 
+    def One(self, shape, dtype, **kwargs):
+        """ A := [1] (matrix of ones) """
+        return op.One(self, shape, dtype, **kwargs)
+
     def CopyIn(self, shape, dtype, **kwargs):
         return op.CopyIn(self, shape, dtype)
 
@@ -458,6 +462,12 @@ class Backend(object):
         """
         raise NotImplementedError()
 
+    @abc.abstractmethod
+    def onemm(self, y, x, alpha=1, beta=0):
+        """
+        Computes Y[:] = beta * Y + alpha * [1] * X.
+        """
+        raise NotImplementedError()
 
     class csr_matrix(object):
         """

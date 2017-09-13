@@ -19,3 +19,9 @@ class CustomCpuBackend(MklBackend):
         _customcpu.csrmm(adjoint, M, N, K, alpha,
             A_vals._arr, A_indx._arr, A_ptr._arr,
             X._arr, ldx, beta, Y._arr, ldy, exwrite)
+
+    def onemm(self, y, x, alpha, beta):
+        ldx = x._leading_dims[0]
+        ldy = y._leading_dims[0]
+        (K, N), M = x.shape, y.shape[0]
+        _customcpu.onemm(M, N, K, alpha, x._arr, ldx, beta, y._arr, ldy)
