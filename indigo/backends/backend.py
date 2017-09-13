@@ -527,9 +527,9 @@ class Backend(object):
         maxiter : int, optional
         {IterPrint, IterPlot, IterWrite, IterCompare}
         """
-        Ap = self.zero_array( (A.shape[0],), x_h.dtype, name='Ap' )
-        x = self.copy_array( x_h, name='x' )
-        b = self.copy_array( b_h, name='b' )
+        x  = self.copy_array( x_h, name='x' )
+        b  = self.copy_array( b_h, name='b' )
+        Ap = x.copy()
 
         # r = b - A(x) - lamda * x
         r = b
