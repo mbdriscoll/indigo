@@ -115,3 +115,12 @@ class NumpyBackend(Backend):
             Y[:] = alpha * (A.H @ X) + beta * Y
         else:
             Y[:] = alpha * (A @ X) + beta * Y
+
+    # -----------------------------------------------------------------------
+    # Misc Routines
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def max(val, arr):
+        mr = np.maximum(arr._arr.real, val)
+        mi = np.maximum(arr._arr.imag, val)
+        arr._arr[:] = mr + 1j * mi

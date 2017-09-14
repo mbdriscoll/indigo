@@ -616,3 +616,7 @@ class Backend(object):
             log.info("iter %d", it)
 
         x_k.copy_to(x_h)
+
+    def max(self, val, arr):
+        """ Computes elementwise maximum: arr[:] = max(arr, val). """
+        raise NotImplementedError()

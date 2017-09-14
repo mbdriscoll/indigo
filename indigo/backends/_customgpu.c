@@ -56,9 +56,24 @@ py_onemm(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+static PyObject*
+py_max(PyObject *self, PyObject *args)
+{
+    float val;
+    unsigned int N;
+    unsigned long arr;
+    if (!PyArg_ParseTuple(args, "Ifk", &N, &val, &arr))
+        return NULL;
+    // promote complex float array to float array
+    c_max(N, val, (float*) arr);
+    Py_RETURN_NONE;
+}
+
+
 static PyMethodDef _customgpuMethods[] = {
     { "exw_csrmm", py_exw_csrmm_H, METH_VARARGS, NULL },
     { "onemm", py_onemm, METH_VARARGS, NULL },
+    { "max", py_max, METH_VARARGS, NULL },
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 

@@ -536,3 +536,13 @@ class CudaBackend(Backend):
         y_h[:] = beta * y_h + alpha * \
             np.broadcast_to(x_h.sum(axis=0, keepdims=True), y_h.shape)
         y.copy_from(y_h)
+
+    # -----------------------------------------------------------------------
+    # Misc Routines
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def max(val, arr):
+        from indigo.backends._customgpu import max as fastmax
+        fastmax(arr.size*2, val, arr._arr.value)
+
+

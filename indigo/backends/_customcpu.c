@@ -229,10 +229,30 @@ py_onemm(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+void c_max(unsigned int N, float val, float *arr) {
+    #pragma omp parallel for
+    for (unsigned int i = 0; i < N; i++)
+        arr[i] = MAX(val, arr[i]);
+}
+
+static PyObject*
+py_max(PyObject *self, PyObject *args)
+{
+    float val;
+    unsigned int N;
+    PyArrayObject *py_arr;
+    if (!PyArg_ParseTuple(args, "IfO", &N, &val, &py_arr))
+        return NULL;
+    complex float *arr = PyArray_DATA(py_arr);
+    // promote complex float array to float array
+    c_max(N, val, (float*) arr);
+    Py_RETURN_NONE;
+}
 
 static PyMethodDef _customcpuMethods[] = {
     { "onemm", py_onemm, METH_VARARGS, NULL },
     { "csrmm", py_csrmm, METH_VARARGS, NULL },
+    { "max", py_max, METH_VARARGS, NULL },
     { "inspect", py_inspect, METH_VARARGS, NULL },
     {NULL, NULL, 0, NULL} /* Sentinel */
 };

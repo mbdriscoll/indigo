@@ -11,3 +11,5 @@ void c_onemm(
     complex float alpha, complex float *X, unsigned int ldx,
     complex float beta, complex float *Y, unsigned int ldy
 );
+
+void c_max(unsigned int N, float val, float *arr);
