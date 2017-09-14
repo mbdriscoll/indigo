@@ -127,3 +127,15 @@ def test_Realize_Scale(backend, M):
     A = 3 * b.Eye(M, dtype=np.complex64)
     A = A.realize()
     assert isinstance(A, SpMatrix)
+
+
+@pytest.mark.parametrize("backend,M,N",
+    list(product( BACKENDS, [3,4], [5,6]))
+)
+def test_Realize_One(backend, M, N):
+    from indigo.operators import SpMatrix
+    b = backend()
+    A = b.One((M,N))
+    A = A.realize()
+    assert isinstance(A, SpMatrix)
+    assert np.all(A._matrix.data == 1)

@@ -169,6 +169,10 @@ class RealizeMatrices(Transform):
         else:
             return node
 
+    def visit_One(self, node):
+        one = spp.csr_matrix( np.ones(node.shape, dtype=node.dtype) )
+        return SpMatrix( node._backend, one, name=node._name)
+
 
 class DistributeKroniOverProd(Transform):
     """ KronI(A*B) ==> KronI(A) * KronI(B) """
