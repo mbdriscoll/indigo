@@ -599,19 +599,22 @@ class Backend(object):
         t_k = 1
 
         for it in range(1,maxiter+1):
-            gradf(gf, y_k)
-            self.axpby(1, x_k, -alpha, gf)
+            profile.extra['it'] = it
 
-            proxg(x_k, alpha)
+            with profile("iter"):
+                gradf(gf, y_k)
+                self.axpby(1, x_k, -alpha, gf)
 
-            t_k1 = (1.0 + np.sqrt(1.0 + 4.0 * t_k**2)) / 2.0
+                proxg(x_k, alpha)
 
-            t_ratio = (t_k - 1) / t_k1
-            self.axpby(0, y_k1, 1+t_ratio, x_k)
-            self.axpby(1, y_k1,  -t_ratio, x_k1)
+                t_k1 = (1.0 + np.sqrt(1.0 + 4.0 * t_k**2)) / 2.0
 
-            x_k1.copy(x_k)
-            y_k.copy(y_k1)
+                t_ratio = (t_k - 1) / t_k1
+                self.axpby(0, y_k1, 1+t_ratio, x_k)
+                self.axpby(1, y_k1,  -t_ratio, x_k1)
+
+                x_k1.copy(x_k)
+                y_k.copy(y_k1)
 
             log.info("iter %d", it)
 
