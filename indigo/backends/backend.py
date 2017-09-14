@@ -289,13 +289,13 @@ class Backend(object):
         """ A := FFT{ . } """
         return op.UnscaledFFT(self, shape, dtype, **kwargs)
 
-    def Eye(self, n, **kwargs):
+    def Eye(self, n, dtype=np.dtype('complex64'), **kwargs):
         """ A := I_n """
-        return op.Eye(self, n, **kwargs)
+        return op.Eye(self, n, dtype=dtype, **kwargs)
 
-    def One(self, shape, dtype, **kwargs):
+    def One(self, shape, dtype=np.dtype('complex64'), **kwargs):
         """ A := [1] (matrix of ones) """
-        return op.One(self, shape, dtype, **kwargs)
+        return op.One(self, shape, dtype=dtype, **kwargs)
 
     def CopyIn(self, shape, dtype, **kwargs):
         return op.CopyIn(self, shape, dtype)
