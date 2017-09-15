@@ -289,9 +289,13 @@ class Backend(object):
         """ A := FFT{ . } """
         return op.UnscaledFFT(self, shape, dtype, **kwargs)
 
-    def Eye(self, n, **kwargs):
+    def Eye(self, n, dtype=np.dtype('complex64'), **kwargs):
         """ A := I_n """
-        return op.Eye(self, n, **kwargs)
+        return op.Eye(self, n, dtype=dtype, **kwargs)
+
+    def One(self, shape, dtype=np.dtype('complex64'), **kwargs):
+        """ A := [1] (matrix of ones) """
+        return op.One(self, shape, dtype=dtype, **kwargs)
 
     def CopyIn(self, shape, dtype, **kwargs):
         return op.CopyIn(self, shape, dtype)
@@ -458,6 +462,12 @@ class Backend(object):
         """
         raise NotImplementedError()
 
+    @abc.abstractmethod
+    def onemm(self, y, x, alpha=1, beta=0):
+        """
+        Computes Y[:] = beta * Y + alpha * [1] * X.
+        """
+        raise NotImplementedError()
 
     class csr_matrix(object):
         """
@@ -589,20 +599,27 @@ class Backend(object):
         t_k = 1
 
         for it in range(1,maxiter+1):
-            gradf(gf, y_k)
-            self.axpby(1, x_k, -alpha, gf)
+            profile.extra['it'] = it
 
-            proxg(x_k, alpha)
+            with profile("iter"):
+                gradf(gf, y_k)
+                self.axpby(1, x_k, -alpha, gf)
 
-            t_k1 = (1.0 + np.sqrt(1.0 + 4.0 * t_k**2)) / 2.0
+                proxg(x_k, alpha)
 
-            t_ratio = (t_k - 1) / t_k1
-            self.axpby(0, y_k1, 1+t_ratio, x_k)
-            self.axpby(1, y_k1,  -t_ratio, x_k1)
+                t_k1 = (1.0 + np.sqrt(1.0 + 4.0 * t_k**2)) / 2.0
 
-            x_k1.copy(x_k)
-            y_k.copy(y_k1)
+                t_ratio = (t_k - 1) / t_k1
+                self.axpby(0, y_k1, 1+t_ratio, x_k)
+                self.axpby(1, y_k1,  -t_ratio, x_k1)
+
+                x_k1.copy(x_k)
+                y_k.copy(y_k1)
 
             log.info("iter %d", it)
 
         x_k.copy_to(x_h)
+
+    def max(self, val, arr):
+        """ Computes elementwise maximum: arr[:] = max(arr, val). """
+        raise NotImplementedError()

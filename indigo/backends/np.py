@@ -81,6 +81,12 @@ class NumpyBackend(Backend):
             y[:] = alpha * (MH @ x) + beta * y
 
     # -----------------------------------------------------------------------
+    # OneMM Routines
+    # -----------------------------------------------------------------------
+    def onemm(self, y, x, alpha, beta):
+        y._arr[:] = beta * y._arr + alpha * \
+            np.broadcast_to(x._arr.sum(axis=0, keepdims=True), y.shape)
+    # -----------------------------------------------------------------------
     # FFT Routines
     # -----------------------------------------------------------------------
     def fftn(self, y, x):
@@ -109,3 +115,12 @@ class NumpyBackend(Backend):
             Y[:] = alpha * (A.H @ X) + beta * Y
         else:
             Y[:] = alpha * (A @ X) + beta * Y
+
+    # -----------------------------------------------------------------------
+    # Misc Routines
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def max(val, arr):
+        mr = np.maximum(arr._arr.real, val)
+        mi = np.maximum(arr._arr.imag, val)
+        arr._arr[:] = mr + 1j * mi

@@ -544,3 +544,25 @@ def test_Difference(backend, M, N, gamma):
     y_exp = (2-4)*x
     y_act = (S-E) * x
     np.testing.assert_allclose(y_act, y_exp, rtol=1e-5)
+
+@pytest.mark.parametrize("backend,M,N,K,alpha,beta,forward",
+    product( BACKENDS, [11,12,13], [15,16], [1,2,3],
+             [0.0, 0.5, 1.0, 1.5], [0.0, 0.5, 1.0, 1.5], [True, False] ))
+def test_One(backend, M, N, K, alpha, beta, forward):
+    x = indigo.util.rand64c(K,N)
+    y = indigo.util.rand64c(M,N)
+    B = backend()
+    O = B.One((M,K), dtype=np.complex64)
+ 
+    if forward:
+        u, v = x, y
+    else:
+        v, u = x, y
+
+    u_d = B.copy_array(u)
+    v_d = B.copy_array(v)
+    exp = beta * v + \
+        np.broadcast_to(alpha*u.sum(axis=0,keepdims=True), v.shape)
+    O.eval(v_d, u_d, alpha=alpha, beta=beta, forward=forward)
+    act = v_d.to_host()
+    np.testing.assert_allclose(act, exp, rtol=1e-5)

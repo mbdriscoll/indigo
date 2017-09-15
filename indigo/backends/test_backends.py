@@ -352,3 +352,16 @@ def test_dndarray_on_host(backend):
 
     arr_h2 = arr_d.to_host()
     assert np.sum(arr_h2) == 11
+
+@pytest.mark.parametrize("backend,val,N", 
+    product(BACKENDS, [-1.5,-1,-0.5,0,0.5,1,1.5], [4,5,6])
+)
+def test_max(backend, val, N):
+    b = backend()
+    if hasattr(b, 'max'):
+        arr = indigo.util.rand64c(N)
+        arr_d = b.copy_array(arr)
+        b.max(val, arr_d)
+        arr_act = arr_d.to_host()
+        np.testing.assert_allclose( np.maximum(arr.real, val), arr_act.real )
+        np.testing.assert_allclose( np.maximum(arr.imag, val), arr_act.imag )
