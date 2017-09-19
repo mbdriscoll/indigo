@@ -200,16 +200,48 @@ class DistributeAdjointOverProd(Transform):
 
 class LiftUnscaledFFTs(Transform):
     def visit_Product(self, node):
-        l = self.visit(node.left_child)
-        r = self.visit(node.right_child)
-        if isinstance(l, Product):
-            ll = l.left_child
-            lr = l.right_child
-            if ll.has(UnscaledFFT):
-                return ll * self.visit(lr*r)
-        if isinstance(r, Product):
-            rl = r.left_child
-            rr = r.right_child
-            if rr.has(UnscaledFFT):
-                return self.visit(l*rl) * rr
-        return l*r
+        node = self.generic_visit(node)
+        if isinstance(node, Product):
+            l, r = node.children
+            if isinstance(l, Product) and l.left_child.has(UnscaledFFT):
+                ll, lr = l.children
+                node = ll * self.visit(lr*r)
+            elif isinstance(r, Product) and r.right_child.has(UnscaledFFT):
+                rl, rr = r.children
+                node = self.visit(l*rl) * rr
+        return self.generic_visit(node)
+
+    def visit_Adjoint(self, node):
+        node = self.generic_visit(node)
+        if isinstance(node.child, Product):
+            node = node.child.right_child.H * node.child.left_child.H
+        return self.generic_visit(node)
+
+    def visit_KronI(self, node):
+        node = self.generic_visit(node)
+        if isinstance(node.child, Product):
+            node = node._backend.KronI(node._c, node.child.left_child) * \
+                   node._backend.KronI(node._c, node.child.right_child)
+        return self.generic_visit(node)
+
+class MakeRightLeaning(Transform):
+    def visit_Product(self, node):
+        node = self.generic_visit(node)
+        if isinstance(node, Product) and isinstance(node.left_child, Product):
+            l, r = node.children
+            ll, lr = l.children
+            return ll * self.visit(lr*r)
+        else:
+            return node
+
+
+class GroupRightLeaningProducts(Transform):
+    def visit_Product(self, node):
+        node = self.generic_visit(node)
+        if isinstance(node, Product):
+            l, r = node.children
+            if isinstance(r, Product):
+                rl, rr = r.children
+                if isinstance(rl, SpMatrix):
+                    node = (l*rl) * rr
+        return node
