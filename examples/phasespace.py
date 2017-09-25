@@ -74,25 +74,11 @@ recipe = [
     GroupRightLeaningProducts,
     RealizeMatrices,
 ]
+A = A.optimize(recipe)
 
 # reshape vectors into 2d fortran-ordered arrays
 Y = imgs.astype(np.complex64).reshape((1,A.shape[0])).T
 X = np.zeros((1,A.shape[1]), dtype=Y.dtype).T
-
-'''
-X2 = np.require(np.random.rand(*X.shape), requirements='C', dtype=X.dtype)
-y_exp = compWrapObj.compATy(compWrapObj.compAx(X2.ravel())).ravel()
-y_act = (A.H * (A * X2)).ravel().real
-for e in range(-8,4):
-    try:
-        np.testing.assert_allclose(y_act, y_exp, rtol=10**e)
-        print("operator is equivalent to rtol=10^%d" % e)
-        break
-    except Exception:
-        pass
-'''
-
-A = A.optimize(recipe)
 
 # solver prep
 AHy = A.H * Y
@@ -106,10 +92,7 @@ if args.solver == 'cg':
 
 elif args.solver == 'fista':
     def proxg(x_d, alpha):
-        # x = max(z, 0)
-        x_h = x_d.to_host()
-        x_h = np.maximum(x_h, 0)
-        x_d.copy_from(x_h)
+        B.max(0, x_d)
         
     def gradf(gf, x):
         AHA.eval(gf, x)
