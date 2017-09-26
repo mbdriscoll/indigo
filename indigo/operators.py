@@ -91,9 +91,10 @@ class Operator(object):
 
     def _dump(self, file, indent=0):
         name = self._name or 'noname'
-        print('{name}, {type}, {shape}, {dtype}'.format(
+        size = self._mem_usage(ncols=1) / 1e6
+        print('{name}, {type}, {shape}, {size} MB, {dtype}'.format(
             name='|   ' * indent + name, type=type(self).__name__,
-            shape=self.shape, dtype=self.dtype), file=file)
+            size=size, shape=self.shape, dtype=self.dtype), file=file)
 
     def optimize(self, recipe=None):
         from indigo.transforms import Optimize
@@ -102,6 +103,9 @@ class Operator(object):
     def memusage(self, ncols=1):
         from indigo.analyses import Memusage
         return Memusage().measure(self, ncols)
+
+    def _mem_usage(self, ncols):
+        return 0
 
     def has(self, *op_classes):
         """ True if this operator or any of its children are of the given type(s). """
@@ -164,9 +168,6 @@ class MatrixFreeOperator(CompositeOperator):
     def dtype(self):
         return self._dtype
 
-    def _mem_usage(self, ncols):
-        return 0
-
 
 class Adjoint(CompositeOperator):
     def __init__(self, backend, children, *args, **kwargs):
@@ -211,6 +212,13 @@ class SpMatrix(Operator):
     @property
     def nnz(self):
         return self._matrix.nnz
+
+    def _mem_usage(self, ncols=1):
+        if not isinstance(self._matrix, spp.csr_matrix):
+            self._matrix = self._matrix.tocsr()
+        return self._matrix.data.size + \
+               self._matrix.indices.size + \
+               self._matrix.indptr.size
 
     def _get_or_create_device_matrix(self):
         if self._matrix_d is None:

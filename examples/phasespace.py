@@ -75,6 +75,7 @@ recipe = [
     RealizeMatrices,
 ]
 A = A.optimize(recipe)
+log.info("final tree:\n%s", A.dump())
 
 # reshape vectors into 2d fortran-ordered arrays
 Y = imgs.astype(np.complex64).reshape((1,A.shape[0])).T
