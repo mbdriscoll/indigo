@@ -199,7 +199,7 @@ class SpMatrix(Operator):
         self._matrix = M
         self._matrix_d = None
 
-        self._allow_exwrite = False
+        self._allow_exwrite = True
 
     @property
     def dtype(self):

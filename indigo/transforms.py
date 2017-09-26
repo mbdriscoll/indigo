@@ -245,3 +245,13 @@ class GroupRightLeaningProducts(Transform):
                 if isinstance(rl, SpMatrix):
                     node = (l*rl) * rr
         return node
+
+
+class SpyOut(Visitor):
+    def visit_SpMatrix(self, node):
+        from matplotlib import pyplot as plt
+
+        m = node._matrix
+        fig, ax = plt.subplots(1, figsize=(16,16))
+        ax.spy(m, markersize=1)
+        fig.savefig('mat.%s.png' % node._name)

@@ -13,7 +13,7 @@ args = parser.parse_args()
 
 img = misc.face()
 img = img[:,:,0] # select one color channel
-img = img.astype(np.complex64) # change datatype
+img = img.astype(np.complex64)
 
 x,z = img.shape
 p = width = 128
@@ -21,7 +21,7 @@ s = overlap = 32
 g = gap = p-2*s
 snr = 10
 
-pfovs = np.array([img[:,c:c+p] for c in range(0,z-g,g)])
+pfovs = np.array([img[c:c+p,:] for c in range(0,x-g,g)])
 
 img_dc = np.mean(abs(img))
 dc_offsets = 2*np.random.rand(len(pfovs)) * img_dc
@@ -47,9 +47,9 @@ indices = np.arange(img.size).reshape(img.shape)
 S_shape = (pfovs.size, img.size)
 data = np.ones(pfovs.size, dtype=np.complex64)
 rows = np.arange(pfovs.size)
-cols = np.array([indices[:,c:c+p] for c in range(0,z-g,g)]).flatten()
+cols = np.array([indices[c:c+p,:] for c in range(0,x-g,g)]).flatten()
 SegOp = spp.coo_matrix((data, (rows,cols)), shape=S_shape)
-S = B.SpMatrix(SegOp, name='segment')
+S = B.SpMatrix(SegOp.getH(), name='segment').H
 
 # construct DC removal operator
 D = B.KronI(npf*px, B.Eye(pz) - (1/pz)*B.One((pz,pz)))
@@ -57,9 +57,15 @@ D = B.KronI(npf*px, B.Eye(pz) - (1/pz)*B.One((pz,pz)))
 # combine operators into forward model
 A = D*S
 A = A.optimize()
+
+import matplotlib
+matplotlib.use('agg')
+from indigo.transforms import SpyOut, RealizeMatrices
+SpyOut().visit(A)
+
 AHA = A.H * A
 
-log.info("final tree %s", A.dump())
+log.info("final tree %s", AHA.dump())
 
 # reshape vectors into 2d fortran-ordered arrays
 Y = pfovs.copy().reshape((1,-1)).T

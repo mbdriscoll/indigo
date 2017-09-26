@@ -44,6 +44,10 @@ with h5py.File(args.data) as hdf:
     log.info("reconstruction data:")
     imgs    = hdf[ 'imgs'][:]
     codes   = hdf['codes'][:]
+
+    #imgs = imgs[:4,:,:]
+    #codes = codes[:4,:3,:,:]
+
     log.info("imgs  %s %s" % ( imgs.shape,  imgs.dtype))
     log.info("codes %s %s" % (codes.shape, codes.dtype))
 
@@ -76,6 +80,11 @@ recipe = [
 ]
 A = A.optimize(recipe)
 log.info("final tree:\n%s", A.dump())
+
+import matplotlib
+matplotlib.use('agg')
+from indigo.transforms import SpyOut
+SpyOut().visit(A)
 
 # reshape vectors into 2d fortran-ordered arrays
 Y = imgs.astype(np.complex64).reshape((1,A.shape[0])).T
