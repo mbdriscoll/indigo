@@ -20,16 +20,30 @@ void cu_onemm(
 ) {
     // matrix is M-K, X is K-N, Y is M-N
     // strategy: accum columns of X, broadcast into columns of Y
+    extern __shared__ cuFloatComplex acc[];
+    int tid = threadIdx.x,
+        n = blockIdx.x;
 
-    int n = blockIdx.x*blockDim.x + threadIdx.x;
-    if (n >= N)
-        return;
+    // per-thread accumulate down X
+    cuFloatComplex acc_n = make_cuComplex(0,0);
+    for (unsigned int k = tid; k < K; k += blockDim.x)
+        acc_n = cuCaddf(acc_n, X[k+n*ldx]);
+    acc[tid] = acc_n;
+    __syncthreads();
 
-    cuFloatComplex acc = make_cuComplex(0,0);
-    for (unsigned int k = 0; k < K; k++)
-        acc = cuCaddf(acc, X[k+n*ldx]);
-    for (unsigned int m = 0; m < M; m++)
-        Y[m+n*ldy] = cuCaddf( cuCmulf(beta, Y[m+n*ldy]), cuCmulf(alpha, acc));
+    // reduce across block
+    for (int i = blockDim.x/2; i > 0; i /= 2) {
+        if (tid < i)
+            acc[tid] = cuCaddf(acc[tid], acc[tid+i]);
+        __syncthreads();
+    }
+
+    // broadcast across block
+    acc_n = acc[0];
+
+    // broadcast into Y
+    for (unsigned int m = tid; m < M; m += blockDim.x)
+        Y[m+n*ldy] = cuCaddf( cuCmulf(beta, Y[m+n*ldy]), cuCmulf(alpha, acc_n));
 }
 
 __global__
@@ -79,8 +93,9 @@ void c_onemm(
     cuFloatComplex beta, cuFloatComplex *Y, unsigned int ldy
 ) {
     int tpb = 128;
-    int nb = (N+tpb-1)/tpb;
-    cu_onemm<<<nb,tpb>>>(M, N, K, alpha, X, ldx, beta, Y, ldy);
+    int nb = N;
+    int ns = tpb * sizeof(cuFloatComplex);
+    cu_onemm<<<nb,tpb,ns>>>(M, N, K, alpha, X, ldx, beta, Y, ldy);
 }
 
 extern "C"
