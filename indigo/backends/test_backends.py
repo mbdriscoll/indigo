@@ -365,3 +365,47 @@ def test_max(backend, val, N):
         arr_act = arr_d.to_host()
         np.testing.assert_allclose( np.maximum(arr.real, val), arr_act.real )
         np.testing.assert_allclose( np.maximum(arr.imag, val), arr_act.imag )
+
+
+from indigo.backends.customgpu import CustomGpuBackend as CGB
+@pytest.mark.parametrize("backend,M,K,N,alpha,beta,maxoffsets,py",
+    product( [CGB], [23,45], [45,23], [1,8,9,17], [0,0.5,1.0,1.5], [0,0.5,1.0,1.5], [1,2,3,4], [True,False] )
+)
+def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets, py):
+    b = backend()
+    if not hasattr(b, 'dia_matrix'):
+        pytest.skip("backend doesn't implement diagonal matrix format")
+    c = np.dtype('complex64')
+    offsets = np.array(list(set(np.random.randint(-K, M+K, size=maxoffsets))))
+    data = np.random.rand(offsets.size, K) + 1j * np.random.rand(offsets.size, K)
+    data = np.require(data, requirements='F', dtype=c)
+    A = spp.dia_matrix((data, offsets), shape=(M,K))
+    A_d = b.dia_matrix(b, A)
+
+    # forward
+    x = (np.random.rand(K,N) + 1j * np.random.rand(K,N))
+    y = (np.random.rand(M,N) + 1j * np.random.rand(M,N))
+    x = np.require(x, dtype=c, requirements='F')
+    y = np.require(y, dtype=c, requirements='F')
+    y_exp = beta * y + alpha * A.dot(x)
+
+    if py:
+        y_act = y.copy()
+        for m in range(M):
+            _y = beta * y_act[m]
+            for d in range(len(offsets)):
+                offset = offsets[d]
+                k = m + offset
+                if 0 <= k < K:
+                    val = alpha * data[d,k]
+                    for n in range(N):
+                        _y[n] += val * x[k,n]
+            y_act[m] = _y
+        np.testing.assert_allclose(y_act, y_exp, atol=1e-5)
+
+    else:
+        x_d = b.copy_array(x)
+        y_d = b.copy_array(y)
+        A_d.forward(y_d, x_d, alpha=alpha, beta=beta)
+        y_act = y_d.to_host()
+        np.testing.assert_allclose(y_act, y_exp, atol=1e-5)

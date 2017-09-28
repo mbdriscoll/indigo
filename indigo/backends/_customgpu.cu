@@ -57,27 +57,65 @@ void cu_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
     if (m >= M)
         return;
 
-    extern __shared__ cuFloatComplex x[];
-
     unsigned int ptrb = rowPtrs[m],
                  ptre = rowPtrs[m+1];
 
     if (ptrb == ptre)
         return;
 
+    extern __shared__ cuFloatComplex x[];
+
     #pragma unroll
-    for (unsigned int n = 0; n < N; n++)
-        x[n] = X[m+n*M];
+    for (int n = 0; n < N; n++)
+        x[n] = cuCmulf(alpha, X[m+n*ldx]);
 
     for (unsigned int idx = ptrb; idx < ptre; idx++) {
         unsigned int k = colInds[idx];
-        cuFloatComplex v = cuCmulf(alpha, cuConjf(values[idx]));
+        cuFloatComplex v = cuConjf(values[idx]);
 
         #pragma unroll
-        for (unsigned int n = 0; n < N; n++)
-            Y[k+n*K] = cuCmulf(v, x[n]);
+        for (unsigned int n = 0; n < N; n++) {
+            Y[k+n*ldy] = cuCaddf( cuCmulf(beta,Y[k+n*ldy]), cuCmulf(v,x[n]) );
+        }
     }
 }
+
+__global__
+void cu_diamm(
+    unsigned int M, unsigned int N, unsigned int K,
+    unsigned int nOffsets, int *offsets, cuFloatComplex *data,
+    cuFloatComplex alpha, cuFloatComplex *X, unsigned int ldx,
+    cuFloatComplex beta, cuFloatComplex *Y, unsigned int ldy, int adjoint
+) {
+    int m = blockIdx.x*blockDim.x + threadIdx.x; // row
+    if (m >= M)
+        return;
+
+    extern __shared__ cuFloatComplex y[];
+
+    #pragma unroll
+    for (int n = 0; n < N; n++)
+        y[n] = cuCmulf(beta, Y[m+n*ldy]);
+    
+    if (adjoint) {
+    } else {
+        for (int d = 0; d < nOffsets; d++) {
+            int offset = offsets[d];
+            int k = m + offset; // col
+            if (0 <= k && k < K) {
+                cuFloatComplex v = data[k+d*K];
+                #pragma unroll
+                for (int n = 0; n < N; n++)
+                    y[n] = cuCaddf(y[n], cuCmulf(v, cuCmulf(alpha, X[k+n*ldx])));
+            }
+        }
+    }
+
+    #pragma unroll
+    for (int n = 0; n < N; n++)
+        Y[m+n*ldy] = y[n];
+}
+
 
 extern "C"
 void c_max(unsigned int N, float val, float *arr) {
@@ -99,19 +137,27 @@ void c_onemm(
 }
 
 extern "C"
+void c_diamm(
+    unsigned int M, unsigned int N, unsigned int K,
+    unsigned int nOffsets, int *offsets, cuFloatComplex *data,
+    cuFloatComplex alpha, cuFloatComplex *X, unsigned int ldx,
+    cuFloatComplex beta, cuFloatComplex *Y, unsigned int ldy, int adjoint
+) {
+    int tpb = 128;
+    int nb = (M + tpb - 1) / tpb;
+    int ns = N * sizeof(cuFloatComplex);
+    cu_diamm<<<nb,tpb,ns>>>(M, N, K, nOffsets, offsets, data,
+        alpha, X, ldx, beta, Y, ldy, adjoint);
+}
+
+extern "C"
 void c_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
     cuFloatComplex alpha, cuFloatComplex *values,
     unsigned int *colInds, unsigned int *rowPtrs,
     cuFloatComplex *X, unsigned int ldx, cuFloatComplex beta,
     cuFloatComplex *Y, unsigned int ldy)
 {
-    // Y[:] *= beta
-    if (cuCrealf(beta) == 0 && cuCimagf(beta) == 0)
-        cudaMemset(Y, 0, K*N*sizeof(cuFloatComplex));
-    else
-        cublasCscal(K*N, beta, Y, 1);
-
-    // Y[:] += alpha * AX
+    // Y[:] = beta*Y + alpha*A*X
     int tpb = 128;
     int nb = (M+tpb-1)/tpb;
     int ns = N * sizeof(cuFloatComplex);

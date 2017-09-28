@@ -255,3 +255,6 @@ class SpyOut(Visitor):
         fig, ax = plt.subplots(1, figsize=(16,16))
         ax.spy(m, markersize=1)
         fig.savefig('mat.%s.png' % node._name)
+
+        from scipy.io import mmwrite
+        mmwrite('mat.%s.mtx' % node._name, m)

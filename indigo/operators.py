@@ -222,14 +222,18 @@ class SpMatrix(Operator):
 
     def _get_or_create_device_matrix(self):
         if self._matrix_d is None:
-            M = self._matrix.tocsr()
-            M.sort_indices() # cuda requires sorted indictes
-            self._matrix_d = self._backend.csr_matrix(self._backend, M, self._name)
-            if not self._allow_exwrite:
-                log.debug("disallowing exwrite for %s" % self._name)
-                self._matrix_d._exwrite = False
+            if self._use_csr:
+                M = self._matrix.tocsr()
+                M.sort_indices() # cuda requires sorted indictes
+                self._matrix_d = self._backend.csr_matrix(self._backend, M, self._name)
+                if not self._allow_exwrite:
+                    log.debug("disallowing exwrite for %s" % self._name)
+                    self._matrix_d._exwrite = False
+                else:
+                    log.debug("allowing exwrite for %s" % self._name)
             else:
-                log.debug("allowing exwrite for %s" % self._name)
+                M = self._matrix.todia()
+                self._matrix_d = self._backend.dia_matrix(self._backend, M, self._name)
         return self._matrix_d
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
