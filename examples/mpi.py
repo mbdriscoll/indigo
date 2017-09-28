@@ -57,14 +57,7 @@ D = B.KronI(npf*px, B.Eye(pz) - (1/pz)*B.One((pz,pz)))
 # combine operators into forward model
 A = D*S
 A = A.optimize()
-
-import matplotlib
-matplotlib.use('agg')
-from indigo.transforms import SpyOut, RealizeMatrices
-SpyOut().visit(A)
-
 AHA = A.H * A
-
 log.info("final tree %s", AHA.dump())
 
 # reshape vectors into 2d fortran-ordered arrays

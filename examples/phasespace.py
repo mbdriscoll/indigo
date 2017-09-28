@@ -89,13 +89,6 @@ recipe = [
 A = A.optimize(recipe)
 log.info("final tree:\n%s", A.dump())
 
-'''
-import matplotlib
-matplotlib.use('agg')
-from indigo.transforms import SpyOut
-SpyOut().visit(A)
-'''
-
 # reshape vectors into 2d fortran-ordered arrays
 Y = imgs.astype(np.complex64).reshape((1,A.shape[0])).T
 X = np.zeros((1,A.shape[1]), dtype=Y.dtype).T
