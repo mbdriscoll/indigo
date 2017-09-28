@@ -85,37 +85,62 @@ void cu_diamm(
     unsigned int M, unsigned int N, unsigned int K,
     unsigned int nOffsets, int *offsets, cuFloatComplex *data,
     cuFloatComplex alpha, cuFloatComplex *X, unsigned int ldx,
-    cuFloatComplex beta, cuFloatComplex *Y, unsigned int ldy, int adjoint
+    cuFloatComplex beta, cuFloatComplex *Y, unsigned int ldy
 ) {
+    // Y is M-by-N
+    // X is K-by-N
+    // A is M-by-K
+    // data is _-by-K
+
     int m = blockIdx.x*blockDim.x + threadIdx.x; // row
     if (m >= M)
         return;
 
-    extern __shared__ cuFloatComplex y[];
-
     #pragma unroll
     for (int n = 0; n < N; n++)
-        y[n] = cuCmulf(beta, Y[m+n*ldy]);
-    
-    if (adjoint) {
-    } else {
-        for (int d = 0; d < nOffsets; d++) {
-            int offset = offsets[d];
-            int k = m + offset; // col
-            if (0 <= k && k < K) {
-                cuFloatComplex v = data[k+d*K];
-                #pragma unroll
-                for (int n = 0; n < N; n++)
-                    y[n] = cuCaddf(y[n], cuCmulf(v, cuCmulf(alpha, X[k+n*ldx])));
-            }
+        Y[m+n*ldy] = cuCmulf(beta, Y[m+n*ldy]);
+
+    for (int d = 0; d < nOffsets; d++) {
+        int k = m + offsets[d]; // col
+        if (0 <= k && k < K) {
+            cuFloatComplex v = cuCmulf(alpha, data[k+d*K]);
+            #pragma unroll
+            for (int n = 0; n < N; n++)
+                Y[m+n*ldy] = cuCaddf(Y[m+n*ldy], cuCmulf(v, X[k+n*ldx]));
         }
     }
+}
+
+__global__
+void cu_diammH(
+    unsigned int M, unsigned int N, unsigned int K,
+    unsigned int nOffsets, int *offsets, cuFloatComplex *data,
+    cuFloatComplex alpha, cuFloatComplex *X, unsigned int ldx,
+    cuFloatComplex beta, cuFloatComplex *Y, unsigned int ldy
+) {
+    // Y is M-by-N
+    // X is K-by-N
+    // AH is M-by-K, A is K-by-M
+    // data is _-by-M
+
+    int m = blockIdx.x*blockDim.x + threadIdx.x; // row
+    if (m >= M)
+        return;
 
     #pragma unroll
     for (int n = 0; n < N; n++)
-        Y[m+n*ldy] = y[n];
-}
+        Y[m+n*ldy] = cuCmulf(beta, Y[m+n*ldy]);
 
+    for (int d = 0; d < nOffsets; d++) {
+        int k = m - offsets[d]; // col
+        if (0 <= k && k < K) {
+            cuFloatComplex v = cuCmulf(alpha, cuConjf(data[m+d*M]));
+            #pragma unroll
+            for (int n = 0; n < N; n++)
+                Y[m+n*ldy] = cuCaddf(Y[m+n*ldy], cuCmulf(v, X[k+n*ldx]));
+        }
+    }
+}
 
 extern "C"
 void c_max(unsigned int N, float val, float *arr) {
@@ -145,9 +170,13 @@ void c_diamm(
 ) {
     int tpb = 128;
     int nb = (M + tpb - 1) / tpb;
-    int ns = N * sizeof(cuFloatComplex);
-    cu_diamm<<<nb,tpb,ns>>>(M, N, K, nOffsets, offsets, data,
-        alpha, X, ldx, beta, Y, ldy, adjoint);
+    if (adjoint) {
+        cu_diammH<<<nb,tpb>>>(M, N, K, nOffsets, offsets, data,
+            alpha, X, ldx, beta, Y, ldy);
+    } else {
+        cu_diamm<<<nb,tpb>>>(M, N, K, nOffsets, offsets, data,
+            alpha, X, ldx, beta, Y, ldy);
+    }
 }
 
 extern "C"

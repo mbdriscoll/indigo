@@ -50,7 +50,7 @@ class CustomGpuBackend(CudaBackend):
             assert isinstance(A, spp.dia_matrix)
             A = A.astype(np.complex64)
             self._backend = backend
-            self.data = backend.copy_array(A.data.T.flatten(), name=name+".data")
+            self.data = backend.copy_array(A.data.T, name=name+".data")
             self.offsets = backend.copy_array(A.offsets, name=name+".data")
             self.shape = A.shape
             self.dtype = A.dtype

@@ -378,7 +378,7 @@ def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets, py):
     c = np.dtype('complex64')
     offsets = np.array(list(set(np.random.randint(-K, M+K, size=maxoffsets))))
     data = np.random.rand(offsets.size, K) + 1j * np.random.rand(offsets.size, K)
-    data = np.require(data, requirements='F', dtype=c)
+    data = data.astype(c)
     A = spp.dia_matrix((data, offsets), shape=(M,K))
     A_d = b.dia_matrix(b, A)
 
@@ -387,7 +387,7 @@ def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets, py):
     y = (np.random.rand(M,N) + 1j * np.random.rand(M,N))
     x = np.require(x, dtype=c, requirements='F')
     y = np.require(y, dtype=c, requirements='F')
-    y_exp = beta * y + alpha * A.dot(x)
+    y_exp = beta * y + alpha * (A @ x)
 
     if py:
         y_act = y.copy()
@@ -409,3 +409,14 @@ def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets, py):
         A_d.forward(y_d, x_d, alpha=alpha, beta=beta)
         y_act = y_d.to_host()
         np.testing.assert_allclose(y_act, y_exp, atol=1e-5)
+
+        x = (np.random.rand(K,N) + 1j * np.random.rand(K,N))
+        y = (np.random.rand(M,N) + 1j * np.random.rand(M,N))
+        x = np.require(x, dtype=c, requirements='F')
+        y = np.require(y, dtype=c, requirements='F')
+        x_d = b.copy_array(x)
+        y_d = b.copy_array(y)
+        x_exp = beta * x + alpha * (A.getH() @ y)
+        A_d.adjoint(x_d, y_d, alpha=alpha, beta=beta)
+        x_act = x_d.to_host()
+        np.testing.assert_allclose(x_act, x_exp, atol=1e-5)
