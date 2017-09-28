@@ -367,9 +367,8 @@ def test_max(backend, val, N):
         np.testing.assert_allclose( np.maximum(arr.imag, val), arr_act.imag )
 
 
-from indigo.backends.customgpu import CustomGpuBackend as CGB
 @pytest.mark.parametrize("backend,M,K,N,alpha,beta,maxoffsets,py",
-    product( [CGB], [23,45], [45,23], [1,8,9,17], [0,0.5,1.0,1.5], [0,0.5,1.0,1.5], [1,2,3,4], [True,False] )
+    product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0,0.5,1.0,1.5], [0,0.5,1.0,1.5], [1,2,3,4], [True,False] )
 )
 def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets, py):
     b = backend()
