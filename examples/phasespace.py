@@ -45,8 +45,8 @@ with h5py.File(args.data) as hdf:
     imgs    = hdf[ 'imgs'][:]
     codes   = hdf['codes'][:]
 
-    #imgs = imgs[:4,:,:]
-    #codes = codes[:4,:3,:,:]
+    #imgs = imgs[:3,:,:]
+    #codes = codes[:3,:2,:,:]
 
     log.info("imgs  %s %s" % ( imgs.shape,  imgs.dtype))
     log.info("codes %s %s" % (codes.shape, codes.dtype))
@@ -70,6 +70,13 @@ A._name = 'phasespace'
 
 # optimize tree
 from indigo.transforms import *
+class CodesInDia(Transform):
+    def visit_SpMatrix(self, node):
+        if 'code' in node._name:
+            log.info("requesting %s be stored in DIA format.", node._name)
+            node._use_dia = True
+        return node
+
 recipe = [
 #    DistributeAdjointOverProd, DistributeKroniOverProd,
     LiftUnscaledFFTs,
@@ -77,14 +84,17 @@ recipe = [
     MakeRightLeaning,
     GroupRightLeaningProducts,
     RealizeMatrices,
+    CodesInDia,
 ]
 A = A.optimize(recipe)
 log.info("final tree:\n%s", A.dump())
 
+'''
 import matplotlib
 matplotlib.use('agg')
 from indigo.transforms import SpyOut
 SpyOut().visit(A)
+'''
 
 # reshape vectors into 2d fortran-ordered arrays
 Y = imgs.astype(np.complex64).reshape((1,A.shape[0])).T

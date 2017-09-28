@@ -54,6 +54,8 @@ class CustomGpuBackend(CudaBackend):
             self.offsets = backend.copy_array(A.offsets, name=name+".data")
             self.shape = A.shape
             self.dtype = A.dtype
+            self._row_frac = 1
+            self._col_frac = 1
 
         def forward(self, y, x, alpha=1, beta=0):
             """ y[:] = A * x """

@@ -200,6 +200,7 @@ class SpMatrix(Operator):
         self._matrix_d = None
 
         self._allow_exwrite = True
+        self._use_dia = False
 
     @property
     def dtype(self):
@@ -214,15 +215,17 @@ class SpMatrix(Operator):
         return self._matrix.nnz
 
     def _mem_usage(self, ncols=1):
-        if not isinstance(self._matrix, spp.csr_matrix):
-            self._matrix = self._matrix.tocsr()
-        return self._matrix.data.size + \
-               self._matrix.indices.size + \
-               self._matrix.indptr.size
+        # FIXME device matrix hasn't been realized so actually not very accurate
+        return self._matrix.data.nbytes
 
     def _get_or_create_device_matrix(self):
         if self._matrix_d is None:
-            if self._use_csr:
+            if self._use_dia:
+                log.debug("storing in DIA format: %s", self._name)
+                M = self._matrix.todia()
+                self._matrix_d = self._backend.dia_matrix(self._backend, M, self._name)
+            else:
+                log.debug("storing in CSR format: %s", self._name)
                 M = self._matrix.tocsr()
                 M.sort_indices() # cuda requires sorted indictes
                 self._matrix_d = self._backend.csr_matrix(self._backend, M, self._name)
@@ -231,21 +234,14 @@ class SpMatrix(Operator):
                     self._matrix_d._exwrite = False
                 else:
                     log.debug("allowing exwrite for %s" % self._name)
-            else:
-                M = self._matrix.todia()
-                self._matrix_d = self._backend.dia_matrix(self._backend, M, self._name)
         return self._matrix_d
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         M = self._get_or_create_device_matrix()
-        if forward:
-            nbytes = M.nbytes + x.nbytes*M._col_frac + y.nbytes*2
-        else:
-            beta_part = 1 if beta == 0 else 2
-            col_part = 1 if M._exwrite else 2
-            nbytes = M.nbytes + x.nbytes*M._row_frac + y.nbytes*(beta_part+col_part*M._col_frac)
+        nbytes = M.nbytes + x.nbytes*M._col_frac + y.nbytes*2
         nflops = 5 * len(self._matrix.data) * x.shape[1]
-        with profile("csrmm", nbytes=nbytes, shape=x.shape, forward=forward, nflops=nflops) as p:
+        event = 'csrmm' if 'csr' in type(M).__name__ else 'diamm'
+        with profile(event, nbytes=nbytes, shape=x.shape, forward=forward, nflops=nflops) as p:
             if forward:
                 M.forward(y, x, alpha=alpha, beta=beta)
             else:
