@@ -463,6 +463,13 @@ class Backend(object):
         raise NotImplementedError()
 
     @abc.abstractmethod
+    def cdiamm(self, y, shape, offsets, data, x, alpha=1.0, beta=0.0, adjoint=True):
+        """
+        Computes Y[:] = A * X.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     def onemm(self, y, x, alpha=1, beta=0):
         """
         Computes Y[:] = beta * Y + alpha * [1] * X.
@@ -520,6 +527,43 @@ class Backend(object):
 
         def _type_correct(self, A):
             return A.astype(np.complex64)
+
+
+    class dia_matrix(object):
+        """
+        A device-resident sparse matrix in DIA format.
+        """
+        def __init__(self, backend, A, name='mat'):
+            """
+            Create a matrix from the given `scipy.sparse.sppmatrix`.
+            """
+            assert isinstance(A, spp.dia_matrix)
+            A = A.astype(np.complex64)
+            self._backend = backend
+            self.data = backend.copy_array(A.data.T, name=name+".data")
+            self.offsets = backend.copy_array(A.offsets, name=name+".data")
+            self.shape = A.shape
+            self.dtype = A.dtype
+            self._row_frac = 1
+            self._col_frac = 1
+
+        def forward(self, y, x, alpha=1, beta=0):
+            """ y[:] = A * x """
+            self._backend.cdiamm(y, self.shape, self.offsets, self.data,
+                x, alpha=alpha, beta=beta, adjoint=False)
+
+        def adjoint(self, y, x, alpha=1, beta=0):
+            """ y[:] = A.H * x """
+            self._backend.cdiamm(y, self.shape, self.offsets, self.data,
+                x, alpha=alpha, beta=beta, adjoint=True)
+
+        @property
+        def nbytes(self):
+            return self.offsets.nbytes + self.data.nbytes
+
+        @property
+        def nnz(self):
+            return self.data.size
 
     # -----------------------------------------------------------------------
     # Algorithms

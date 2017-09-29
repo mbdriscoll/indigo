@@ -372,8 +372,6 @@ def test_max(backend, val, N):
 )
 def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets, py):
     b = backend()
-    if not hasattr(b, 'dia_matrix'):
-        pytest.skip("backend doesn't implement diagonal matrix format")
     c = np.dtype('complex64')
     offsets = np.array(list(set(np.random.randint(-K, M+K, size=maxoffsets))))
     data = np.random.rand(offsets.size, K) + 1j * np.random.rand(offsets.size, K)
@@ -407,6 +405,14 @@ def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets, py):
         y_d = b.copy_array(y)
         A_d.forward(y_d, x_d, alpha=alpha, beta=beta)
         y_act = y_d.to_host()
+
+        af, ef = y_act.flatten(), y_exp.flatten()
+        for i in range(len(af)):
+            if np.isnan(af[i]):
+                print("nan in y_act at pos", i)
+            if np.isnan(ef[i]):
+                print("nan in y_exp at pos", i)
+
         np.testing.assert_allclose(y_act, y_exp, atol=1e-5)
 
         x = (np.random.rand(K,N) + 1j * np.random.rand(K,N))

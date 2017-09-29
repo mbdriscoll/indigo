@@ -3,6 +3,7 @@ import os, sys, time
 from ctypes import *
 
 import numpy as np
+import scipy.sparse as spp
 from numpy.ctypeslib import ndpointer
 
 from .backend import Backend
@@ -395,6 +396,63 @@ class MklBackend(Backend):
             self.mkl_ccsrmm(transA, m, n, k, alpha,
                 descrA, A_vals, A_indx, A_ptrb, A_ptre,
                 x, ldx, beta, y, ldy)
+
+    # -----------------------------------------------------------------------
+    # DIAMM Routines
+    # -----------------------------------------------------------------------
+
+    @wrap
+    def mkl_cdiamm(
+        transA   : c_char*1,
+        m        : ndpointer(dtype=np.int32,     ndim=0),
+        n        : ndpointer(dtype=np.int32,     ndim=0),
+        k        : ndpointer(dtype=np.int32,     ndim=0),
+        alpha    : ndpointer(dtype=np.dtype('complex64'), ndim=1),
+        matdescA : c_char * 6,
+        val      : dndarray,
+        lval     : ndpointer(dtype=np.int32,     ndim=0),
+        idiag    : dndarray,
+        ndiag    : ndpointer(dtype=np.int32,     ndim=0),
+        b        : dndarray,
+        ldb      : ndpointer(dtype=np.int32,     ndim=0),
+        beta     : ndpointer(dtype=np.dtype('complex64'), ndim=1),
+        c        : dndarray,
+        ldc      : ndpointer(dtype=np.int32,     ndim=0),
+    ) -> c_void_p :
+        pass
+
+    class dia_matrix(Backend.dia_matrix):
+        '''
+        Diagonal storage format for MKL backends.
+
+        MKL stores diagonals that span the vertical dimension of the matrix. This is opposite
+        from cuda and numpy formats. Here, we convert numpy's horizontal-diagonal representation
+        into a vertical one by conjugating the data entries and negating the offsets. The
+        evalation routines then compute forward indigo evaluations as adjoint MKL evalutions on
+        this alternative representation.
+        '''
+        def __init__(self, backend, A, name='mat'):
+            A2 = spp.dia_matrix( (np.conj(A.data), -A.offsets ), shape=A.shape[::-1])
+            super().__init__(backend, A2, name=name)
+
+    def cdiamm(self, y, shape, offsets, data, x, alpha=1.0, beta=0.0, adjoint=False):
+        transA = create_string_buffer(b'N' if adjoint else b'C', size=1)
+        ldx = np.array(x._leading_dims[0], dtype=np.int32)
+        ldy = np.array(y._leading_dims[0], dtype=np.int32)
+
+        m     = np.array(shape[0],   dtype=np.int32)
+        n     = np.array(x.shape[1], dtype=np.int32)
+        k     = np.array(shape[1],   dtype=np.int32)
+        alpha = np.array([alpha],    dtype=np.dtype('complex64'))
+        beta  = np.array([beta],     dtype=np.dtype('complex64'))
+
+        descrA = create_string_buffer(b'G_NF__', size=6)
+        lval  = np.array(data.shape[0], dtype=np.int32)
+        ndiag = np.array(len(offsets._arr), dtype=np.int32)
+
+        self.mkl_cdiamm(transA, m, n, k, alpha,
+            descrA, data, lval, offsets, ndiag,
+            x, ldx, beta, y, ldy)
 
     # -----------------------------------------------------------------------
     # ONEMM Routines

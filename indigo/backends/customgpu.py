@@ -19,7 +19,7 @@ class CustomGpuBackend(CudaBackend):
                 Y, A_shape, A_indx, A_ptr, A_vals, X, alpha, beta, adjoint, exwrite=exwrite
             )
 
-    def diamm(self, y, shape, offsets, data, x, alpha=1.0, beta=0.0, adjoint=True):
+    def cdiamm(self, y, shape, offsets, data, x, alpha=1.0, beta=0.0, adjoint=True):
         ldx = x._leading_dims[0]
         ldy = y._leading_dims[0]
         (K, N), M = x.shape, y.shape[0]
@@ -36,41 +36,4 @@ class CustomGpuBackend(CudaBackend):
             beta,  y._arr.value, ldy)
 
     def max(self, val, arr):
-        _customgpu.max(arr.size*2, val, arr._arr.value)
-
-
-    class dia_matrix(object):
-        """
-        A device-resident sparse matrix in DIA format.
-        """
-        def __init__(self, backend, A, name='mat'):
-            """
-            Create a matrix from the given `scipy.sparse.sppmatrix`.
-            """
-            assert isinstance(A, spp.dia_matrix)
-            A = A.astype(np.complex64)
-            self._backend = backend
-            self.data = backend.copy_array(A.data.T, name=name+".data")
-            self.offsets = backend.copy_array(A.offsets, name=name+".data")
-            self.shape = A.shape
-            self.dtype = A.dtype
-            self._row_frac = 1
-            self._col_frac = 1
-
-        def forward(self, y, x, alpha=1, beta=0):
-            """ y[:] = A * x """
-            self._backend.diamm(y, self.shape, self.offsets, self.data,
-                x, alpha=alpha, beta=beta, adjoint=False)
-
-        def adjoint(self, y, x, alpha=1, beta=0):
-            """ y[:] = A.H * x """
-            self._backend.diamm(y, self.shape, self.offsets, self.data,
-                x, alpha=alpha, beta=beta, adjoint=True)
-
-        @property
-        def nbytes(self):
-            return self.offsets.nbytes + self.data.nbytes
-
-        @property
-        def nnz(self):
-            return self.data.size
+        _customgpu.max(arr.size*3, val, arr._arr.value)
