@@ -63,7 +63,8 @@ void cu_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
     if (ptrb == ptre)
         return;
 
-    extern __shared__ cuFloatComplex x[];
+    extern __shared__ cuFloatComplex _x[];
+    cuFloatComplex *x = _x + N*threadIdx.x;
 
     #pragma unroll
     for (int n = 0; n < N; n++)
@@ -189,6 +190,6 @@ void c_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
     // Y[:] = beta*Y + alpha*A*X
     int tpb = 128;
     int nb = (M+tpb-1)/tpb;
-    int ns = N * sizeof(cuFloatComplex);
+    int ns = N * tpb * sizeof(cuFloatComplex);
     cu_exw_csrmm_H<<<nb,tpb,ns>>>(M, N, K, alpha, values, colInds, rowPtrs, X, ldx, beta, Y, ldy);
 }
