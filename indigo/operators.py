@@ -251,7 +251,7 @@ class SpMatrix(Operator):
         nbytes = M.nbytes + x.nbytes*read_frac + y.nbytes*y_part
         nflops = 5 * len(self._matrix.data) * x.shape[1]
         event = 'csrmm' if 'csr' in type(M).__name__ else 'diamm'
-        with profile(event, yval=y_part, nbytes=nbytes, shape=x.shape, forward=forward, nflops=nflops) as p:
+        with profile(event, xval=read_frac, yval=y_part, nbytes=nbytes, shape=x.shape, forward=forward, nflops=nflops) as p:
             if forward:
                 M.forward(y, x, alpha=alpha, beta=beta)
             else:

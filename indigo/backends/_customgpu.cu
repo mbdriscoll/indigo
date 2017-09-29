@@ -64,7 +64,7 @@ void cu_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
         return;
 
     extern __shared__ cuFloatComplex _x[];
-    cuFloatComplex *x = _x + N*threadIdx.x;
+    cuFloatComplex *x = &_x[N*threadIdx.x];
 
     #pragma unroll
     for (int n = 0; n < N; n++)
@@ -75,9 +75,8 @@ void cu_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
         cuFloatComplex v = cuConjf(values[idx]);
 
         #pragma unroll
-        for (unsigned int n = 0; n < N; n++) {
-            Y[k+n*ldy] = cuCaddf( cuCmulf(beta,Y[k+n*ldy]), cuCmulf(v,x[n]) );
-        }
+        for (int n = 0; n < N; n++)
+            Y[k+n*ldy] = cuCaddf( Y[k+n*ldy], cuCmulf(v,x[n]) );
     }
 }
 
@@ -187,9 +186,16 @@ void c_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
     cuFloatComplex *X, unsigned int ldx, cuFloatComplex beta,
     cuFloatComplex *Y, unsigned int ldy)
 {
-    // Y[:] = beta*Y + alpha*A*X
+    // Y[:] *= beta
+    if (cuCrealf(beta) == 0 && cuCimagf(beta) == 0)
+        cudaMemset(Y, 0, K*N*sizeof(cuFloatComplex));
+    else
+        cublasCscal(K*N, beta, Y, 1);
+
+    // Y[:] += alpha*A*X
     int tpb = 128;
     int nb = (M+tpb-1)/tpb;
     int ns = N * tpb * sizeof(cuFloatComplex);
+    printf("m n k %d %d %d\n", M, N, K); fflush(stdout);
     cu_exw_csrmm_H<<<nb,tpb,ns>>>(M, N, K, alpha, values, colInds, rowPtrs, X, ldx, beta, Y, ldy);
 }

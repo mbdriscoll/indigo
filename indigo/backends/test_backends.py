@@ -172,6 +172,40 @@ def test_csr_matrix(backend, M, N, K, density):
     np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
 
 
+@pytest.mark.parametrize("backend,M,N,alpha,beta,stack",
+    product( BACKENDS, [23,45], [1,8,9,17], [0.0,0.5,1.0,1.5], [0.0,0.5,1.0,1.5], [1,2,5] )
+)
+def test_exw_csr_matrix(backend, M, N, alpha, beta, stack):
+    b = backend()
+    c = np.dtype('complex64')
+    d0 = spp.diags(np.arange(M))
+    d1 = spp.diags(np.arange(M)+100)
+    A = spp.vstack([spp.diags(np.arange(M)+s*100) for s in range(stack)]).astype(c)
+    A_d = b.csr_matrix(b, A)
+
+    # forward
+    x = (np.random.rand(M,N) + 1j * np.random.rand(M,N))
+    y = (np.random.rand(stack*M,N) + 1j * np.random.rand(stack*M,N))
+    x = np.require(x, dtype=c, requirements='F')
+    y = np.require(y, dtype=c, requirements='F')
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    A_d.forward(y_d, x_d, alpha=alpha, beta=beta)
+    y_act = y_d.to_host()
+    y_exp = beta * y + alpha * (A @ x)
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-3)
+
+    # adjoint
+    x = (np.random.rand(stack*M,N) + 1j * np.random.rand(stack*M,N)).astype(c)
+    y = (np.random.rand(M,N) + 1j * np.random.rand(M,N)).astype(c)
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    A_d.adjoint(y_d, x_d, alpha=alpha, beta=beta)
+    y_act = y_d.to_host()
+    y_exp = beta * y + alpha * (A.getH() @ x)
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-3)
+
+
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_op_dump(backend):
     b = backend()
