@@ -36,4 +36,4 @@ class CustomGpuBackend(CudaBackend):
             beta,  y._arr.value, ldy)
 
     def max(self, val, arr):
-        _customgpu.max(arr.size*3, val, arr._arr.value)
+        _customgpu.max(arr.size*2, val, arr._arr.value)
