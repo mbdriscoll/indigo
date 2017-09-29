@@ -238,7 +238,14 @@ class SpMatrix(Operator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         M = self._get_or_create_device_matrix()
-        nbytes = M.nbytes + x.nbytes*M._col_frac + y.nbytes*2
+        if forward:
+            read_frac, write_frac = M._col_frac, M._row_frac
+        else:
+            read_frac, write_frac = M._row_frac, M._col_frac
+        if beta == 0:   beta_part = 1
+        elif beta == 1: beta_part = write_frac
+        else:           beta_part = 2
+        nbytes = M.nbytes + x.nbytes*read_frac + y.nbytes*beta_part
         nflops = 5 * len(self._matrix.data) * x.shape[1]
         event = 'csrmm' if 'csr' in type(M).__name__ else 'diamm'
         with profile(event, nbytes=nbytes, shape=x.shape, forward=forward, nflops=nflops) as p:
