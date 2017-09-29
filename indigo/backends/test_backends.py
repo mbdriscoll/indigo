@@ -367,11 +367,13 @@ def test_max(backend, val, N):
         np.testing.assert_allclose( np.maximum(arr.imag, val), arr_act.imag )
 
 
-@pytest.mark.parametrize("backend,M,K,N,alpha,beta,maxoffsets,py",
-    product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0,0.5,1.0,1.5], [0,0.5,1.0,1.5], [1,2,3,4], [True,False] )
+@pytest.mark.parametrize("backend,M,K,N,alpha,beta,maxoffsets",
+    product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0,0.5,1.0,1.5], [0,0.5,1.0,1.5], [1,2,3,4] )
 )
-def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets, py):
+def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets):
     b = backend()
+    if getattr(b.cdiamm, '__isabstractmethod__', False):
+        pytest.skip("backed <%s> doesn't implement cdiamm" % backend.__name__)
     c = np.dtype('complex64')
     offsets = np.array(list(set(np.random.randint(-K, M+K, size=maxoffsets))))
     data = np.random.rand(offsets.size, K) + 1j * np.random.rand(offsets.size, K)
@@ -386,42 +388,19 @@ def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets, py):
     y = np.require(y, dtype=c, requirements='F')
     y_exp = beta * y + alpha * (A @ x)
 
-    if py:
-        y_act = y.copy()
-        for m in range(M):
-            _y = beta * y_act[m]
-            for d in range(len(offsets)):
-                offset = offsets[d]
-                k = m + offset
-                if 0 <= k < K:
-                    val = alpha * data[d,k]
-                    for n in range(N):
-                        _y[n] += val * x[k,n]
-            y_act[m] = _y
-        np.testing.assert_allclose(y_act, y_exp, atol=1e-5)
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    A_d.forward(y_d, x_d, alpha=alpha, beta=beta)
+    y_act = y_d.to_host()
+    np.testing.assert_allclose(y_act, y_exp, atol=1e-5)
 
-    else:
-        x_d = b.copy_array(x)
-        y_d = b.copy_array(y)
-        A_d.forward(y_d, x_d, alpha=alpha, beta=beta)
-        y_act = y_d.to_host()
-
-        af, ef = y_act.flatten(), y_exp.flatten()
-        for i in range(len(af)):
-            if np.isnan(af[i]):
-                print("nan in y_act at pos", i)
-            if np.isnan(ef[i]):
-                print("nan in y_exp at pos", i)
-
-        np.testing.assert_allclose(y_act, y_exp, atol=1e-5)
-
-        x = (np.random.rand(K,N) + 1j * np.random.rand(K,N))
-        y = (np.random.rand(M,N) + 1j * np.random.rand(M,N))
-        x = np.require(x, dtype=c, requirements='F')
-        y = np.require(y, dtype=c, requirements='F')
-        x_d = b.copy_array(x)
-        y_d = b.copy_array(y)
-        x_exp = beta * x + alpha * (A.getH() @ y)
-        A_d.adjoint(x_d, y_d, alpha=alpha, beta=beta)
-        x_act = x_d.to_host()
-        np.testing.assert_allclose(x_act, x_exp, atol=1e-5)
+    x = (np.random.rand(K,N) + 1j * np.random.rand(K,N))
+    y = (np.random.rand(M,N) + 1j * np.random.rand(M,N))
+    x = np.require(x, dtype=c, requirements='F')
+    y = np.require(y, dtype=c, requirements='F')
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    x_exp = beta * x + alpha * (A.getH() @ y)
+    A_d.adjoint(x_d, y_d, alpha=alpha, beta=beta)
+    x_act = x_d.to_host()
+    np.testing.assert_allclose(x_act, x_exp, atol=1e-5)

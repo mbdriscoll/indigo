@@ -525,18 +525,6 @@ class CudaBackend(Backend):
             A_vals, A_ptr, A_indx, x, ldx, (beta), y, ldy
         )
 
-
-    # -----------------------------------------------------------------------
-    # ONEMM Routines
-    # -----------------------------------------------------------------------
-    def onemm(self, y, x, alpha, beta):
-        log.warn("cuda doesn't implement ONEMM. Using numpy instead.")
-        x_h = x.to_host()
-        y_h = y.to_host()
-        y_h[:] = beta * y_h + alpha * \
-            np.broadcast_to(x_h.sum(axis=0, keepdims=True), y_h.shape)
-        y.copy_from(y_h)
-
     # -----------------------------------------------------------------------
     # Misc Routines
     # -----------------------------------------------------------------------

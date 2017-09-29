@@ -552,6 +552,8 @@ def test_One(backend, M, N, K, alpha, beta, forward):
     x = indigo.util.rand64c(K,N)
     y = indigo.util.rand64c(M,N)
     B = backend()
+    if not hasattr(B, 'onemm'):
+        pytest.skip("backend doesn't implement onemm")
     O = B.One((M,K), dtype=np.complex64)
  
     if forward:
