@@ -438,3 +438,17 @@ def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets):
     A_d.adjoint(x_d, y_d, alpha=alpha, beta=beta)
     x_act = x_d.to_host()
     np.testing.assert_allclose(x_act, x_exp, atol=1e-5)
+
+
+@pytest.mark.parametrize("backend,dtype",
+    product(BACKENDS, [np.complex128, np.int32, np.float32, np.float64])
+)
+def test_only_complex64(backend, dtype):
+    b = backend()
+    M, N, K, density = 22, 33, 44, 0.50
+    A0 = indigo.util.randM(M, N, density).astype(dtype)
+    x = indigo.util.rand64c(N,K)
+    y = indigo.util.rand64c(M,K)
+    with pytest.raises(AssertionError):
+        A = b.SpMatrix(A0).eval(y,x)
+
