@@ -9,14 +9,6 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-void custom_normalize(complex float *__restrict__ x, const int n) {
-  #pragma omp parallel for
-  for (int i = 0; i < n; i++) {
-    // x[i] = sqrtf(crealf(x[i])*crealf(x[i]) + cimagf(x[i])*cimagf(x[i]));
-    x[i] = x[i] / cabsf(x[i]);
-  }
-}
-
 extern void mkl_ccsrmv (const char *transa , const int *m , const int *k , const complex float *alpha , const char *matdescra , const complex float *val , const int *indx , const int *pntrb , const int *pntre , const complex float *x , const complex float *beta , complex float *y );
 
 void custom_ccc_csrmm(
@@ -132,6 +124,13 @@ void custom_onemm(
     }
 }
 
+void custom_normalize(const int N, complex float *__restrict__ X) {
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < N; i++) {
+        X[i] = X[i] / cabsf(X[i]);
+    }
+}
+
 // --------------------------------------------------------------------------
 // Python interface
 // --------------------------------------------------------------------------
@@ -140,20 +139,6 @@ void custom_onemm(
 
 #include "Python.h"
 #include <numpy/arrayobject.h>
-
-static PyObject*
-py_normalize(PyObject *self, PyObject *args)
-{
-    PyArrayObject *py_x;
-    unsigned int n;
-    if (!PyArg_ParseTuple(args, "Oi",
-        &py_x, &n))
-        return NULL;
-
-    complex float *x = PyArray_DATA(py_x);
-    custom_normalize(x, n);
-    Py_RETURN_NONE;
-}
 
 static PyObject*
 py_csrmm(PyObject *self, PyObject *args)
@@ -269,6 +254,20 @@ py_max(PyObject *self, PyObject *args)
     complex float *arr = PyArray_DATA(py_arr);
     // promote complex float array to float array
     c_max(N, val, (float*) arr);
+    Py_RETURN_NONE;
+}
+
+static PyObject*
+py_normalize(PyObject *self, PyObject *args)
+{
+    PyArrayObject *py_X;
+    unsigned int N;
+    if (!PyArg_ParseTuple(args, "iO",
+        &N, &py_X))
+        return NULL;
+
+    complex float *X = PyArray_DATA(py_X);
+    custom_normalize(N, X);
     Py_RETURN_NONE;
 }
 

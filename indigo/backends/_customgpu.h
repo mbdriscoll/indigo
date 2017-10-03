@@ -13,3 +13,5 @@ void c_onemm(
 );
 
 void c_max(unsigned int N, float val, float *arr);
+
+void c_normalize(unsigned int N, complex float *X);

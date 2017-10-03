@@ -69,11 +69,25 @@ py_max(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+static PyObject*
+py_normalize(PyObject *self, PyObject *args)
+{
+    PyArrayObject *py_X;
+    unsigned int N;
+    if (!PyArg_ParseTuple(args, "iO",
+        &N, &py_X))
+        return NULL;
+
+    complex float *X = PyArray_DATA(py_X);
+    c_normalize(N, (complex float *) X);
+    Py_RETURN_NONE;
+}
 
 static PyMethodDef _customgpuMethods[] = {
     { "exw_csrmm", py_exw_csrmm_H, METH_VARARGS, NULL },
     { "onemm", py_onemm, METH_VARARGS, NULL },
     { "max", py_max, METH_VARARGS, NULL },
+    { "normalize", py_normalize, METH_VARARGS, NULL },
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 

@@ -5,6 +5,16 @@
 //#include "_customgpu.h"
 
 __global__
+void cu_normalize(unsigned int N, cuFloatComplex *X)
+{
+    int n = blockIdx.x*blockDim.x + threadIdx.x;
+    if (n >= N)
+      return;
+
+    X[n] = cuCdivf(X[n], make_cuFloatComplex(cuCabsf(X[n]), 0.0f));
+}
+
+__global__
 void cu_max(unsigned int N, float val, float *arr) {
     int n = blockIdx.x*blockDim.x + threadIdx.x;
     if (n >= N)
@@ -63,6 +73,13 @@ void cu_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
         for (unsigned int n = 0; n < N; n++)
             Y[k+n*K] = cuCmulf(v, x[n]);
     }
+}
+
+extern "C"
+void c_normalize(unsigned int N, cuFloatComplex *X) {
+    int tpb = 128;
+    int nb = (N+tpb-1)/tpb;
+    cu_normalize<<<nb,tpb>>>(N, X);
 }
 
 extern "C"

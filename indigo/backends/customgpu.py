@@ -28,3 +28,6 @@ class CustomGpuBackend(CudaBackend):
 
     def max(self, val, arr):
         _customgpu.max(arr.size*2, val, arr._arr.value)
+
+    def normalize(self, x):
+        _customgpu.normalize(x.size, x._arr)

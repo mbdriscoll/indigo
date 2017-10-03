@@ -27,4 +27,4 @@ class CustomCpuBackend(MklBackend):
         _customcpu.onemm(M, N, K, alpha, x._arr, ldx, beta, y._arr, ldy)
 
     def normalize(self, x):
-        _customcpu.normalize(x._arr, x.size)
+        _customcpu.normalize(x.size, x._arr)
