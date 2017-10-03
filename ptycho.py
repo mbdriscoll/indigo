@@ -55,7 +55,6 @@ Q,QHQinv = ops.gen_Q(nx, ny, nframes, omega, mapidx)
 # Initial guess
 psi0 = ops.gen_psi0(Nx, Ny, image)
 z = Q.dot(psi0)
-print('psi0 %s, z %s' % (psi0.dtype, z.dtype))
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger('ptycho')
@@ -63,57 +62,32 @@ log = logging.getLogger('ptycho')
 # Construct F and Q operators with Indigo.
 from indigo.backends import get_backend
 b = get_backend('customcpu')
-F = b.KronI(nframes, b.FFT((nx, ny), dtype=np.complex64), name='F')
 
-fn = F.norm
-print('Q: %s, QHQinv: %s' % (Q.dtype,QHQinv.dtype))
+F = b.KronI(nframes, b.FFT((nx, ny), dtype=np.complex64), name='F')
+A = b.SpMatrix(spp.diags(a_data.flatten(), dtype=np.complex64), name='A')
+
+# Operator to project z onto A
+PA = F.H * A * F.norm
 
 Qop = b.SpMatrix(Q, name='Q')
 PQ = Qop * b.SpMatrix(QHQinv, name='QHQinv') * b.SpMatrix(Q.H, name='QH')
 
-print(Q.shape)
-print(QHQinv.shape)
+PQPA = PQ * PA
 
-FHA = F.H * b.SpMatrix(spp.diags(a_data.flatten(), dtype=np.complex64), name='A')
-PQFHA = PQ * FHA
+print('Operator tree: %s' % (PQPA.dump(),))
 
 # import matplotlib.pyplot as plt
 # fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
 
-print('F (2st part): %s' % (F.dump(),))
-print('PQFHA (2nd part): %s' % (PQFHA.dump(),))
-
-import sys
-
 iterations = 10
-z_d = b.rand_array(z.shape)
-Fz_d = b.zero_array(z.shape, dtype=z.dtype)
-print('frist?')
-print('dtype %s' % (z.dtype,))
-fn.eval(Fz_d, z_d)
-Fz = Fz_d.to_host()
-Fzn = Fz.copy()
-Fz_d = b.zero_array(z.shape, dtype=z.dtype)
-F.eval(Fz_d, z_d)
-Fz_d.copy_to(Fz)
-print(Fzn)
-print(Fz / (np.abs(Fz) + 0.1))
-Fz_d = b.zero_array(z.shape, dtype=z.dtype)
-
 z_d = b.copy_array(z)
+new_z_d = b.zero_array(z.shape, dtype=z.dtype)
 
 for i in range(iterations):
-    print('Forward eval:')
-    F.eval(Fz_d, z_d)
-    print('Done forward eval')
-
-    Fz_d.copy_to(Fz)
-    Fz = Fz / (np.abs(Fz) + 0.1)
-    Fz_d.copy_from(Fz)
-
-    print('Backward eval:')
-    PQFHA.eval(z_d, Fz_d)
-    print('Done backward eval.')
+    PQPA.eval(new_z_d, z_d)
+    z = new_z_d.to_host()
+    new_z_d = b.zero_array(z.shape, dtype=z.dtype)
+    z_d = b.copy_array(z)
     '''
     z = tmp_d.to_host()
     psi = Q.H.dot(z)

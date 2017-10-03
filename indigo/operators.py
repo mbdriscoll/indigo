@@ -84,7 +84,7 @@ class Operator(object):
 
     @property
     def norm(self):
-        return Normalize(self._backend, self, name="%s/|%s|" % (self._name, self._name))
+        return Normalize(self._backend, self, name=self._name+".norm")
 
     def dump(self):
         """
@@ -544,7 +544,6 @@ class Scale(CompositeOperator):
 class Normalize(CompositeOperator):
     def __init__(self, backend, child, **kwargs):
         super().__init__(backend, child, **kwargs)
-        self._name = "%s*{}".format(child._name)
 
     @property
     def shape(self):
