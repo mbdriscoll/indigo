@@ -556,7 +556,8 @@ class Normalize(CompositeOperator):
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         assert(forward == True)
         self.child.eval(y, x, alpha=alpha, beta=beta, forward=forward)
-        self._backend.normalize(y)
+        with profile("normalize", nbytes=y.nbytes, shape=y.shape, forward=forward) as p:
+            self._backend.normalize(y)
 
 class One(MatrixFreeOperator):
     def _eval(self, y, x, alpha=1, beta=0, forward=None):

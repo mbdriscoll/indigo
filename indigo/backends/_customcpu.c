@@ -12,7 +12,8 @@
 void custom_normalize(complex float *__restrict__ x, const int n) {
   #pragma omp parallel for
   for (int i = 0; i < n; i++) {
-    x[i] = sqrtf(crealf(x[i])*crealf(x[i]) + cimagf(x[i])*cimagf(x[i]));
+    // x[i] = sqrtf(crealf(x[i])*crealf(x[i]) + cimagf(x[i])*cimagf(x[i]));
+    x[i] = x[i] / cabsf(x[i]);
   }
 }
 

@@ -3,6 +3,14 @@ import numpy as np
 import scipy.sparse as spp
 import ops
 
+def center(x, isFFT=False):
+    if not isFFT:
+        x = np.fft.fft2(x)
+    x = np.fft.fftshift(x)
+    if not isFFT:
+        x = np.fft.ifft2(x)
+    return x
+
 import logging
 
 fname = 'CoPd77827_20x20pts_50nmstps_400x10ms_R_RUN3.cxi'
@@ -82,23 +90,25 @@ plt.ion()
 plt.show()
 
 iterations = 10
+
 z_d = b.copy_array(z)
 new_z_d = b.zero_array(z.shape, dtype=z.dtype)
-
 for i in range(iterations):
     PQPA.eval(new_z_d, z_d)
-    z = new_z_d.to_host()
-    z_d = b.copy_array(z)
-    new_z_d = b.zero_array(z.shape, dtype=z.dtype)
 
+    z = new_z_d.to_host()
+    tmp = z_d
+    z_d = new_z_d
+    new_z_d = tmp
     psi = Q.H.dot(z)
 
     samples = z.reshape(nframes, nx, ny)
     sample = 23
     x = samples[sample]
     Fx = np.fft.fft2(x)
-    ax1.matshow(np.abs(x))
-    ax2.matshow(np.abs(Fx))
-    ax3.matshow(np.abs(psi.reshape(Nx, Ny)))
-    ax4.matshow(np.abs(np.fft.fft2(psi.reshape(Nx, Ny))))
+    ax1.matshow(np.abs(center(x)))
+    ax2.matshow(np.abs(center(Fx, isFFT=True)))
+    ax3.matshow(np.abs(center(psi.reshape(Nx, Ny))))
+    ax4.matshow(np.abs(center(np.fft.fft2(psi.reshape(Nx, Ny)), isFFT=True)))
     plt.pause(0.1)
+
