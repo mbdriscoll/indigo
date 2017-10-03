@@ -69,15 +69,17 @@ A = b.SpMatrix(spp.diags(a_data.flatten(), dtype=np.complex64), name='A')
 # Operator to project z onto A
 PA = F.H * A * F.norm
 
-Qop = b.SpMatrix(Q, name='Q')
-PQ = Qop * b.SpMatrix(QHQinv, name='QHQinv') * b.SpMatrix(Q.H, name='QH')
+PQ = b.SpMatrix(Q, name='Q') * b.SpMatrix(QHQinv, name='QHQinv') * b.SpMatrix(Q.H, name='QH')
 
 PQPA = PQ * PA
 
 print('Operator tree: %s' % (PQPA.dump(),))
 
-# import matplotlib.pyplot as plt
-# fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+import matplotlib.pyplot as plt
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+
+plt.ion()
+plt.show()
 
 iterations = 10
 z_d = b.copy_array(z)
@@ -86,10 +88,9 @@ new_z_d = b.zero_array(z.shape, dtype=z.dtype)
 for i in range(iterations):
     PQPA.eval(new_z_d, z_d)
     z = new_z_d.to_host()
-    new_z_d = b.zero_array(z.shape, dtype=z.dtype)
     z_d = b.copy_array(z)
-    '''
-    z = tmp_d.to_host()
+    new_z_d = b.zero_array(z.shape, dtype=z.dtype)
+
     psi = Q.H.dot(z)
 
     samples = z.reshape(nframes, nx, ny)
@@ -100,4 +101,4 @@ for i in range(iterations):
     ax2.matshow(np.abs(Fx))
     ax3.matshow(np.abs(psi.reshape(Nx, Ny)))
     ax4.matshow(np.abs(np.fft.fft2(psi.reshape(Nx, Ny))))
-    '''
+    plt.pause(0.1)
