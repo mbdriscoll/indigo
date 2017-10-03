@@ -2,11 +2,19 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 #include <omp.h>
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
+
+void custom_normalize(complex float *__restrict__ x, const int n) {
+  #pragma omp parallel for
+  for (int i = 0; i < n; i++) {
+    x[i] = sqrtf(crealf(x[i])*crealf(x[i]) + cimagf(x[i])*cimagf(x[i]));
+  }
+}
 
 extern void mkl_ccsrmv (const char *transa , const int *m , const int *k , const complex float *alpha , const char *matdescra , const complex float *val , const int *indx , const int *pntrb , const int *pntre , const complex float *x , const complex float *beta , complex float *y );
 
@@ -133,6 +141,20 @@ void custom_onemm(
 #include <numpy/arrayobject.h>
 
 static PyObject*
+py_normalize(PyObject *self, PyObject *args)
+{
+    PyArrayObject *py_x;
+    unsigned int n;
+    if (!PyArg_ParseTuple(args, "Oi",
+        &py_x, &n))
+        return NULL;
+
+    complex float *x = PyArray_DATA(py_x);
+    custom_normalize(x, n);
+    Py_RETURN_NONE;
+}
+
+static PyObject*
 py_csrmm(PyObject *self, PyObject *args)
 {
     PyObject *py_alpha, *py_beta;
@@ -254,6 +276,7 @@ static PyMethodDef _customcpuMethods[] = {
     { "csrmm", py_csrmm, METH_VARARGS, NULL },
     { "max", py_max, METH_VARARGS, NULL },
     { "inspect", py_inspect, METH_VARARGS, NULL },
+    { "normalize", py_normalize, METH_VARARGS, NULL },
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 

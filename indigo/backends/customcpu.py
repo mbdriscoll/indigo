@@ -25,3 +25,6 @@ class CustomCpuBackend(MklBackend):
         ldy = y._leading_dims[0]
         (K, N), M = x.shape, y.shape[0]
         _customcpu.onemm(M, N, K, alpha, x._arr, ldx, beta, y._arr, ldy)
+
+    def normalize(self, x):
+        _customcpu.normalize(x._arr, x.size)

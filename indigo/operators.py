@@ -80,6 +80,10 @@ class Operator(object):
     def H(self):
         return Adjoint(self._backend, self, name=self._name+".H")
 
+    @property
+    def norm(self):
+        return Normalize(self._backend, self, name="%s/|%s|" % (self._name, self._name))
+
     def dump(self):
         """
         Returns a textual representation of the operator tree.
@@ -533,6 +537,24 @@ class Scale(CompositeOperator):
         a = alpha * (self._val if forward else np.conj(self._val))
         self.child.eval(y, x, alpha=a, beta=beta, forward=forward)
 
+
+class Normalize(CompositeOperator):
+    def __init__(self, backend, child, **kwargs):
+        super().__init__(backend, child, **kwargs)
+        self._name = "%s*{}".format(child._name)
+
+    @property
+    def shape(self):
+        return self.child.shape
+
+    @property
+    def dtype(self):
+        return self.child.dtype
+
+    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+        assert(forward == True)
+        self.child.eval(y, x, alpha=alpha, beta=beta, forward=forward)
+        self._backend.normalize(y)
 
 class One(MatrixFreeOperator):
     def _eval(self, y, x, alpha=1, beta=0, forward=None):
