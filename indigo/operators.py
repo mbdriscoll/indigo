@@ -19,6 +19,8 @@ class Operator(object):
 
     def eval(self, y, x, alpha=1, beta=0, forward=True):
         """ y = A * x """
+        assert x.dtype == np.complex64
+        assert y.dtype == np.complex64
         if x.ndim == 1: x = x.reshape( (x.shape[0], 1) )
         if y.ndim == 1: y = y.reshape( (y.shape[0], 1) )
         M, N = self.shape if forward else tuple(reversed(self.shape))
@@ -199,6 +201,7 @@ class SpMatrix(Operator):
         """
         super().__init__(backend, **kwargs)
         assert isinstance(M, spp.spmatrix)
+        assert M.dtype == np.complex64
         self._matrix = M
         self._matrix_d = None
 
