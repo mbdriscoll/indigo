@@ -37,6 +37,25 @@ def available_backends():
 
     return backends
 
+def custom_backends():
+    backends = []
+
+    try:
+        from indigo.backends.customcpu import CustomCpuBackend
+        backends.append( CustomCpuBackend )
+    except Exception as e:
+        log.warn("couldn't find CustomCpu backend")
+
+    '''
+    try:
+        from indigo.backends.customgpu import CustomGpuBackend
+        backends.append( CustomGpuBackend )
+    except Exception as e:
+        log.warn("couldn't find CustomGpu backend")
+    '''
+
+    return backends
+
 def get_backend(name, **init):
     """
     Instantiates the requested backend.

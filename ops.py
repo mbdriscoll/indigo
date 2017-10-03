@@ -58,13 +58,13 @@ def gen_psi0(Nx, Ny, image):
     msk = distance_transform_edt(msk)
     msk = erf(msk/10)
     psi0 = psi0 * msk + psi0[0] * (1 - msk)
-    return psi0.flatten()
+    return psi0.flatten().astype(np.complex64)
 
 def gen_Q(nx, ny, nframes, omega, mapidx):
     eps = (np.max(np.abs(omega))**2)*5e-2
-    Q = spp.csc_matrix((np.tile(omega+eps, nframes), (np.arange(0, nx*ny*nframes), mapidx.flatten())))
+    Q = spp.csc_matrix((np.tile(omega+eps, nframes), (np.arange(0, nx*ny*nframes), mapidx.flatten())), dtype=np.complex64)
     QHQ = Q.H.dot(Q)
-    QHQinv = spp.diags(np.ones(QHQ.diagonal().shape) / QHQ.diagonal())
+    QHQinv = spp.diags(np.ones(QHQ.diagonal().shape) / QHQ.diagonal(), dtype=np.complex64)
     return Q,QHQinv
 
 # Helper functions

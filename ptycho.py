@@ -55,14 +55,18 @@ Q,QHQinv = ops.gen_Q(nx, ny, nframes, omega, mapidx)
 # Initial guess
 psi0 = ops.gen_psi0(Nx, Ny, image)
 z = Q.dot(psi0)
+print('psi0 %s, z %s' % (psi0.dtype, z.dtype))
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger('ptycho')
 
 # Construct F and Q operators with Indigo.
 from indigo.backends import get_backend
-b = get_backend('mkl')
+b = get_backend('customcpu')
 F = b.KronI(nframes, b.FFT((nx, ny), dtype=np.complex64), name='F')
+
+fn = F.norm
+print('Q: %s, QHQinv: %s' % (Q.dtype,QHQinv.dtype))
 
 Qop = b.SpMatrix(Q, name='Q')
 PQ = Qop * b.SpMatrix(QHQinv, name='QHQinv') * b.SpMatrix(Q.H, name='QH')
@@ -70,7 +74,7 @@ PQ = Qop * b.SpMatrix(QHQinv, name='QHQinv') * b.SpMatrix(Q.H, name='QH')
 print(Q.shape)
 print(QHQinv.shape)
 
-FHA = F.H * b.SpMatrix(spp.diags(a_data.flatten()), name='A')
+FHA = F.H * b.SpMatrix(spp.diags(a_data.flatten(), dtype=np.complex64), name='A')
 PQFHA = PQ * FHA
 
 # import matplotlib.pyplot as plt
@@ -82,16 +86,29 @@ print('PQFHA (2nd part): %s' % (PQFHA.dump(),))
 import sys
 
 iterations = 10
-z_d = b.copy_array(z)
+z_d = b.rand_array(z.shape)
 Fz_d = b.zero_array(z.shape, dtype=z.dtype)
+print('frist?')
+print('dtype %s' % (z.dtype,))
+fn.eval(Fz_d, z_d)
 Fz = Fz_d.to_host()
+Fzn = Fz.copy()
+Fz_d = b.zero_array(z.shape, dtype=z.dtype)
+F.eval(Fz_d, z_d)
+Fz_d.copy_to(Fz)
+print(Fzn)
+print(Fz / (np.abs(Fz) + 0.1))
+Fz_d = b.zero_array(z.shape, dtype=z.dtype)
+
+z_d = b.copy_array(z)
+
 for i in range(iterations):
     print('Forward eval:')
     F.eval(Fz_d, z_d)
     print('Done forward eval')
 
     Fz_d.copy_to(Fz)
-    Fz = Fz / np.abs(Fz)
+    Fz = Fz / (np.abs(Fz) + 0.1)
     Fz_d.copy_from(Fz)
 
     print('Backward eval:')

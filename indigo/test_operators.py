@@ -5,8 +5,9 @@ import numpy.testing as npt
 from itertools import product
 
 import indigo
-from indigo.backends import available_backends
+from indigo.backends import available_backends,custom_backends
 BACKENDS = available_backends()
+CUSTOM_BACKENDS = custom_backends()
 
 @pytest.mark.parametrize("backend,M,N,K,density,alpha,beta",
     product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
@@ -566,3 +567,18 @@ def test_One(backend, M, N, K, alpha, beta, forward):
     O.eval(v_d, u_d, alpha=alpha, beta=beta, forward=forward)
     act = v_d.to_host()
     np.testing.assert_allclose(act, exp, rtol=1e-5)
+
+@pytest.mark.parametrize("backend,M,N,K,alpha,beta,forward",
+    product( CUSTOM_BACKENDS, [11,12,13], [15,16], [1,2,3],
+             [0.0, 0.5, 1.0, 1.5], [0.0, 0.5, 1.0, 1.5], [True] ))
+def test_Normalize(backend, M, N, K, alpha, beta, forward):
+    b = backend()
+    A_h = indigo.util.randM(M, N, density=0.1)
+    A = b.SpMatrix(A_h).norm
+
+    # forward
+    x = b.rand_array((N,K))
+    y = b.rand_array((M,K))
+    y_exp = np.abs(beta * y.to_host() + alpha * A_h * x.to_host())
+    A.eval(y, x, alpha=alpha, beta=beta)
+    npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
