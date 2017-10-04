@@ -144,7 +144,8 @@ def test_Realize_One(backend, M, N):
     list(product( BACKENDS, [3,4], [5,6]))
 )
 def test_SpyOut(backend, M, N):
-    import matplotlib; matplotlib.use('Agg')
+    matplotlib = pytest.importorskip('matplotlib')
+    matplotlib.use('Agg')
     from indigo.operators import SpMatrix
     from indigo.transforms import SpyOut
     b = backend()
