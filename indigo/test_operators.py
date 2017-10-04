@@ -579,6 +579,7 @@ def test_Normalize(backend, M, N, K, alpha, beta, forward):
     # forward
     x = b.rand_array((N,K))
     y = b.rand_array((M,K))
-    y_exp = np.abs(beta * y.to_host() + alpha * A_h * x.to_host())
+    y_exp = beta * y.to_host() + alpha * A_h * x.to_host()
+    y_exp /= np.abs(y_exp)
     A.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)

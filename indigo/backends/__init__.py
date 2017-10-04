@@ -46,13 +46,11 @@ def custom_backends():
     except Exception as e:
         log.warn("couldn't find CustomCpu backend")
 
-    '''
     try:
         from indigo.backends.customgpu import CustomGpuBackend
         backends.append( CustomGpuBackend )
     except Exception as e:
         log.warn("couldn't find CustomGpu backend")
-    '''
 
     return backends
 
