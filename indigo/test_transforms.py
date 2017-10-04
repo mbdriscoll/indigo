@@ -192,5 +192,5 @@ def test_LiftUFFTS2(backend, M, N):
     from indigo.operators import SpMatrix
     from indigo.transforms import LiftUnscaledFFTs
     b = backend()
-    A = b.UnscaledFFT((M,N), dtype=np.complex64).realize()
+    A = b.UnscaledFFT((M,N), dtype=np.complex64).realize().H
     LiftUnscaledFFTs().visit(A)
