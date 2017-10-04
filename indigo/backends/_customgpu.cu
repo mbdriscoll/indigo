@@ -5,12 +5,10 @@
 //#include "_customgpu.h"
 
 __global__
-void cu_normalize(unsigned int N, cuFloatComplex *X)
-{
+void cu_normalize(unsigned int N, cuFloatComplex *X) {
     int n = blockIdx.x*blockDim.x + threadIdx.x;
     if (n >= N)
       return;
-
     X[n] = cuCdivf(X[n], make_cuFloatComplex(cuCabsf(X[n]), 0.0f));
 }
 

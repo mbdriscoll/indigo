@@ -73,12 +73,12 @@ static PyObject*
 py_normalize(PyObject *self, PyObject *args)
 {
     PyArrayObject *py_X;
+    unsigned long X;
     unsigned int N;
-    if (!PyArg_ParseTuple(args, "iO",
-        &N, &py_X))
+    if (!PyArg_ParseTuple(args, "ik",
+        &N, &X))
         return NULL;
 
-    complex float *X = PyArray_DATA(py_X);
     c_normalize(N, (complex float *) X);
     Py_RETURN_NONE;
 }
