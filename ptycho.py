@@ -69,7 +69,7 @@ log = logging.getLogger('ptycho')
 
 # Construct F and Q operators with Indigo.
 from indigo.backends import get_backend
-b = get_backend('customcpu')
+b = get_backend('customgpu')
 
 F = b.KronI(nframes, b.FFT((nx, ny), dtype=np.complex64), name='F')
 A = b.SpMatrix(spp.diags(a_data.flatten(), dtype=np.complex64), name='A')
@@ -77,11 +77,64 @@ A = b.SpMatrix(spp.diags(a_data.flatten(), dtype=np.complex64), name='A')
 # Operator to project z onto A
 PA = F.H * A * F.norm
 
-PQ = b.SpMatrix(Q, name='Q') * b.SpMatrix(QHQinv, name='QHQinv') * b.SpMatrix(Q.H, name='QH')
+QOp = b.SpMatrix(Q, name='Q')
+QHQinvOp = b.SpMatrix(QHQinv, name='QHQinv')
+
+PQ = QOp * QHQinvOp * QOp.H
 
 PQPA = PQ * PA
 
+from indigo.transforms import Transform, Visitor, LiftUnscaledFFTs, DistributeKroniOverProd
+from indigo.operators import Product, Adjoint, SpMatrix, KronI
+
+class DistributeAdjoint(Transform):
+    def visit_Adjoint(self, node):
+        if isinstance(node.child, KronI):
+            return self.visit(b.KronI(node.child._c, node.child.child.H, name=node.child._name))
+        elif isinstance(node.child, Product):
+            l, r = node.child.children
+            return self.visit(r.H) * self.visit(l.H)
+        else:
+            return node
+
+class RealizeAdjoints(Transform):
+    def visit_Adjoint(self, node):
+        print('Visiting adjoint... %s' % (node._name))
+        if isinstance(node.child, SpMatrix):
+            print('Going to try to return SpMatrix')
+            return b.SpMatrix(node.child._matrix.H, name=node.child._name + '.H')
+        return node
+
+class MakeRightLeaning(Transform):
+    def visit_Product(self, node):
+        l = self.visit(node.left_child)
+        r = self.visit(node.right_child)
+        if isinstance(l, Product):
+            ll = l.left_child
+            lr = l.right_child
+            return self.visit(ll*(lr*r))
+        else:
+            return l*r
+
+class RotateRealizeScaleA(Transform):
+    def visit_Product(self, node):
+        if node._name == '*A*F.norm':
+            return ((node.left * node.right.left).realize() * node.right.right)
+        return self.generic_visit(node)
+
+class RealizeQQHQinv(Transform):
+    def visit_Product(self, node):
+        if node._name == 'Q*QHQinv*Q.H***A*F.norm':
+            return (node.left * node.right.left).realize() * node.right.right
+        return self.generic_visit(node)
+
+recipe = [DistributeKroniOverProd, LiftUnscaledFFTs, DistributeAdjoint,
+          MakeRightLeaning, RotateRealizeScaleA, RealizeAdjoints,
+          RealizeQQHQinv]
+
 print('Operator tree: %s' % (PQPA.dump(),))
+PQPA = PQPA.optimize(recipe)
+print('%s after optimizing.' % (PQPA.dump(),))
 
 import matplotlib.pyplot as plt
 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
@@ -93,13 +146,19 @@ iterations = 10
 
 z_d = b.copy_array(z)
 new_z_d = b.zero_array(z.shape, dtype=z.dtype)
-for i in range(iterations):
-    PQPA.eval(new_z_d, z_d)
 
-    z = new_z_d.to_host()
+import time
+begin = time.time()
+for i in range(iterations):
+    print('EVAL\'ing')
+    PQPA.eval(new_z_d, z_d)
+    print('DONE EVAL\'ing')
+
     tmp = z_d
     z_d = new_z_d
     new_z_d = tmp
+
+    z = z_d.to_host()
     psi = Q.H.dot(z)
 
     samples = z.reshape(nframes, nx, ny)
@@ -110,5 +169,7 @@ for i in range(iterations):
     ax2.matshow(np.abs(center(Fx, isFFT=True)))
     ax3.matshow(np.abs(center(psi.reshape(Nx, Ny))))
     ax4.matshow(np.abs(center(np.fft.fft2(psi.reshape(Nx, Ny)), isFFT=True)))
-    plt.pause(0.1)
+    plt.pause(0.01)
 
+end = time.time()
+print('%s s for %s iterations (%s/iter)' % (end - begin, iterations, (end - begin) / iterations))
