@@ -91,9 +91,10 @@ class Operator(object):
 
     def _dump(self, file, indent=0):
         name = self._name or 'noname'
-        print('{name}, {type}, {shape}, {dtype}'.format(
+        size = self._mem_usage(ncols=1) / 1e6
+        print('{name}, {type}, {shape}, {size} MB, {dtype}'.format(
             name='|   ' * indent + name, type=type(self).__name__,
-            shape=self.shape, dtype=self.dtype), file=file)
+            size=size, shape=self.shape, dtype=self.dtype), file=file)
 
     def optimize(self, recipe=None):
         from indigo.transforms import Optimize
@@ -102,6 +103,9 @@ class Operator(object):
     def memusage(self, ncols=1):
         from indigo.analyses import Memusage
         return Memusage().measure(self, ncols)
+
+    def _mem_usage(self, ncols):
+        return 0
 
     def has(self, *op_classes):
         """ True if this operator or any of its children are of the given type(s). """
@@ -164,9 +168,6 @@ class MatrixFreeOperator(CompositeOperator):
     def dtype(self):
         return self._dtype
 
-    def _mem_usage(self, ncols):
-        return 0
-
 
 class Adjoint(CompositeOperator):
     def __init__(self, backend, children, *args, **kwargs):
@@ -198,7 +199,8 @@ class SpMatrix(Operator):
         self._matrix = M
         self._matrix_d = None
 
-        self._allow_exwrite = False
+        self._allow_exwrite = True
+        self._use_dia = False
 
     @property
     def dtype(self):
@@ -212,28 +214,45 @@ class SpMatrix(Operator):
     def nnz(self):
         return self._matrix.nnz
 
+    def _mem_usage(self, ncols=1):
+        # FIXME device matrix hasn't been realized so actually not very accurate
+        return self._matrix.data.nbytes
+
     def _get_or_create_device_matrix(self):
         if self._matrix_d is None:
-            M = self._matrix.tocsr()
-            M.sort_indices() # cuda requires sorted indictes
-            self._matrix_d = self._backend.csr_matrix(self._backend, M, self._name)
-            if not self._allow_exwrite:
-                log.debug("disallowing exwrite for %s" % self._name)
-                self._matrix_d._exwrite = False
+            assert self._matrix.dtype == np.dtype('complex64'), 'Indigo only supports single precision complex numbers for now.'
+            if self._use_dia:
+                log.debug("storing in DIA format: %s", self._name)
+                M = self._matrix.todia()
+                self._matrix_d = self._backend.dia_matrix(self._backend, M, self._name)
             else:
-                log.debug("allowing exwrite for %s" % self._name)
+                log.debug("storing in CSR format: %s", self._name)
+                M = self._matrix.tocsr()
+                M.sort_indices() # cuda requires sorted indictes
+                self._matrix_d = self._backend.csr_matrix(self._backend, M, self._name)
+                if not self._allow_exwrite:
+                    log.debug("disallowing exwrite for %s" % self._name)
+                    self._matrix_d._exwrite = False
+                else:
+                    log.debug("allowing exwrite for %s" % self._name)
         return self._matrix_d
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
         M = self._get_or_create_device_matrix()
         if forward:
-            nbytes = M.nbytes + x.nbytes*M._col_frac + y.nbytes*2
+            read_frac, write_frac = M._col_frac, M._row_frac
         else:
-            beta_part = 1 if beta == 0 else 2
-            col_part = 1 if M._exwrite else 2
-            nbytes = M.nbytes + x.nbytes*M._row_frac + y.nbytes*(beta_part+col_part*M._col_frac)
+            read_frac, write_frac = M._row_frac, M._col_frac
+        if beta == 0:
+            y_part = 1
+        elif beta == 1:
+            y_part = write_frac * (1 if M._exwrite else 2)
+        else:
+            y_part = 2
+        nbytes = M.nbytes + x.nbytes*read_frac + y.nbytes*y_part
         nflops = 5 * len(self._matrix.data) * x.shape[1]
-        with profile("csrmm", nbytes=nbytes, shape=x.shape, forward=forward, nflops=nflops) as p:
+        event = 'csrmm' if 'csr' in type(M).__name__ else 'diamm'
+        with profile(event, xval=read_frac, yval=y_part, nbytes=nbytes, shape=x.shape, forward=forward, nflops=nflops) as p:
             if forward:
                 M.forward(y, x, alpha=alpha, beta=beta)
             else:
@@ -317,7 +336,10 @@ class Eye(MatrixFreeOperator):
         super().__init__(backend, shape=(n,n), **kwargs)
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True):
-        self._backend.axpby(beta, y, alpha, x)
+        nbytes = (0 if alpha == 0 else x.nbytes) + \
+                 (0 if beta == 0 else y.nbytes)
+        with profile("axpby", nbytes=nbytes) as p:
+            self._backend.axpby(beta, y, alpha, x)
 
 
 class KronI(CompositeOperator):
@@ -536,4 +558,7 @@ class Scale(CompositeOperator):
 
 class One(MatrixFreeOperator):
     def _eval(self, y, x, alpha=1, beta=0, forward=None):
-        self._backend.onemm(y, x, alpha, beta)
+        nbytes = (0 if alpha == 0 else x.nbytes) + \
+                 (0 if beta == 0 else y.nbytes)
+        with profile("onemm", nbytes=nbytes) as p:
+            self._backend.onemm(y, x, alpha, beta)

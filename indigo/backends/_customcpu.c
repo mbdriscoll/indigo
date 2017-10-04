@@ -1,6 +1,7 @@
 #include <complex.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 
 #include <omp.h>
@@ -79,26 +80,35 @@ void custom_ccc_csrmm(
     } else {
         #pragma omp parallel
         {
-            complex float * acc = malloc(N * sizeof(complex float));
+            #define W 8
+
+            complex float acc[W*N];
 
             #pragma omp for schedule(static)
-            for (unsigned int m = 0; m < M; m++) {
-                #pragma unroll
-                for (unsigned int n = 0; n < N; n++)
-                    acc[n] = 0;
-                for (unsigned int i = pntrb[m]; i < pntre[m]; i++) {
-                    unsigned int k = col[i];
-                    complex float v = val[i];
-                    #pragma unroll
-                    for (unsigned int n = 0; n < N; n++)
-                        acc[n] += v * B[k+n*ldb];
-                }
-                #pragma unroll
-                for (unsigned int n = 0; n < N; n++)
-                    C[m+n*ldc] = alpha * acc[n] + beta * C[m+n*ldc];
-            }   
+            for (unsigned int m = 0; m < M; m += W) {
 
-            free(acc);
+                memset(acc, 0, W*N*sizeof(complex float));
+
+                for (int idx = 0; ; idx++) { // for every potential nonzero in row
+                    char alive = 0;
+                    for (int w = 0; w < W && m+w < M; w++) { // for every row in block
+                        unsigned int i = pntrb[m+w] + idx; // compute index into value array
+                        if (i < pntre[m+w]) { // if a nonzero exists in that row at that index
+                            alive = 1;
+                            unsigned int k = col[i];
+                            complex float v = val[i];
+                            for (unsigned int n = 0; n < N; n++)
+                                acc[w*N+n] += v * B[k+n*ldb];
+                        }
+                    }
+                    if (!alive) // no more nonzeros. finished.
+                        break;
+                }
+
+                for (unsigned int n = 0; n < N; n++)
+                for (unsigned int w = 0; w < W && m+w < M; w++)
+                    C[(m+w)+n*ldc] = alpha * acc[w*N+n] + beta * C[(m+w)+n*ldc];
+            }
         }
     }
 }

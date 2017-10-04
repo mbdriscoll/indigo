@@ -10,3 +10,5 @@ omit =
 [report]
 exclude_lines =
     NotImplementedError
+    except Exception
+    log.warn

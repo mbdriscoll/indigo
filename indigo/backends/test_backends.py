@@ -172,6 +172,40 @@ def test_csr_matrix(backend, M, N, K, density):
     np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
 
 
+@pytest.mark.parametrize("backend,M,N,alpha,beta,stack",
+    product( BACKENDS, [23,45], [1,8,9,17], [0.0,0.5,1.0,1.5], [0.0,0.5,1.0,1.5], [1,2,5] )
+)
+def test_exw_csr_matrix(backend, M, N, alpha, beta, stack):
+    b = backend()
+    c = np.dtype('complex64')
+    d0 = spp.diags(np.arange(M))
+    d1 = spp.diags(np.arange(M)+100)
+    A = spp.vstack([spp.diags(np.arange(M)+s*100) for s in range(stack)]).astype(c)
+    A_d = b.csr_matrix(b, A)
+
+    # forward
+    x = (np.random.rand(M,N) + 1j * np.random.rand(M,N))
+    y = (np.random.rand(stack*M,N) + 1j * np.random.rand(stack*M,N))
+    x = np.require(x, dtype=c, requirements='F')
+    y = np.require(y, dtype=c, requirements='F')
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    A_d.forward(y_d, x_d, alpha=alpha, beta=beta)
+    y_act = y_d.to_host()
+    y_exp = beta * y + alpha * (A @ x)
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-3)
+
+    # adjoint
+    x = (np.random.rand(stack*M,N) + 1j * np.random.rand(stack*M,N)).astype(c)
+    y = (np.random.rand(M,N) + 1j * np.random.rand(M,N)).astype(c)
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    A_d.adjoint(y_d, x_d, alpha=alpha, beta=beta)
+    y_act = y_d.to_host()
+    y_exp = beta * y + alpha * (A.getH() @ x)
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-3)
+
+
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_op_dump(backend):
     b = backend()
@@ -365,3 +399,56 @@ def test_max(backend, val, N):
         arr_act = arr_d.to_host()
         np.testing.assert_allclose( np.maximum(arr.real, val), arr_act.real )
         np.testing.assert_allclose( np.maximum(arr.imag, val), arr_act.imag )
+
+
+@pytest.mark.parametrize("backend,M,K,N,alpha,beta,maxoffsets",
+    product( BACKENDS, [23,45], [45,23], [1,8,9,17], [0,0.5,1.0,1.5], [0,0.5,1.0,1.5], [1,2,3,4] )
+)
+def test_dia_matrix(backend, M, K, N, alpha, beta, maxoffsets):
+    b = backend()
+    if getattr(b.cdiamm, '__isabstractmethod__', False):
+        pytest.skip("backed <%s> doesn't implement cdiamm" % backend.__name__)
+    c = np.dtype('complex64')
+    offsets = np.array(list(set(np.random.randint(-K, M+K, size=maxoffsets))))
+    data = np.random.rand(offsets.size, K) + 1j * np.random.rand(offsets.size, K)
+    data = data.astype(c)
+    A = spp.dia_matrix((data, offsets), shape=(M,K))
+    A_d = b.dia_matrix(b, A)
+
+    # forward
+    x = (np.random.rand(K,N) + 1j * np.random.rand(K,N))
+    y = (np.random.rand(M,N) + 1j * np.random.rand(M,N))
+    x = np.require(x, dtype=c, requirements='F')
+    y = np.require(y, dtype=c, requirements='F')
+    y_exp = beta * y + alpha * (A @ x)
+
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    A_d.forward(y_d, x_d, alpha=alpha, beta=beta)
+    y_act = y_d.to_host()
+    np.testing.assert_allclose(y_act, y_exp, atol=1e-5)
+
+    x = (np.random.rand(K,N) + 1j * np.random.rand(K,N))
+    y = (np.random.rand(M,N) + 1j * np.random.rand(M,N))
+    x = np.require(x, dtype=c, requirements='F')
+    y = np.require(y, dtype=c, requirements='F')
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    x_exp = beta * x + alpha * (A.getH() @ y)
+    A_d.adjoint(x_d, y_d, alpha=alpha, beta=beta)
+    x_act = x_d.to_host()
+    np.testing.assert_allclose(x_act, x_exp, atol=1e-5)
+
+
+@pytest.mark.parametrize("backend,dtype",
+    product(BACKENDS, [np.complex128, np.int32, np.float32, np.float64])
+)
+def test_only_complex64(backend, dtype):
+    b = backend()
+    M, N, K, density = 22, 33, 44, 0.50
+    A0 = indigo.util.randM(M, N, density).astype(dtype)
+    x = indigo.util.rand64c(N,K)
+    y = indigo.util.rand64c(M,K)
+    with pytest.raises(AssertionError):
+        A = b.SpMatrix(A0).eval(y,x)
+

@@ -83,9 +83,9 @@ slc[dim.READ] = slice(None)
 slc[dim.PHS1] = slice(None)
 slc[dim.PHS2] = slice(None)
 
-osf = (640/480, 270/208, 432/308) # cpu
-#osf = (600/480, 264/208, 432/308) # knl
-#osf = (600/480, 270/208, 392/308) # gpu
+#osf = (640/480, 270/208, 432/308) # cpu
+#osf = (640/480, 288/208, 400/308) # knl
+osf = (600/480, 270/208, 392/308) # gpu
 
 F1= B.NUFFT(ksp_nc_dims[:3], ksp_c_dims[:3], traj[slc], oversamp=osf, dtype=ksp.dtype)
 F = B.KronI(C, F1)

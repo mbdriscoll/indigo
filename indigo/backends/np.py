@@ -116,6 +116,15 @@ class NumpyBackend(Backend):
         else:
             Y[:] = alpha * (A @ X) + beta * Y
 
+    def cdiamm(self, y, shape, offsets, data, x, alpha=1.0, beta=0.0, adjoint=True):
+        A = spp.dia_matrix((data._arr.T, offsets._arr), shape=shape)
+        X = x._arr.reshape( x.shape, order='F' )
+        Y = y._arr.reshape( y.shape, order='F' )
+        if adjoint:
+            Y[:] = alpha * (A.H @ X) + beta * Y
+        else:
+            Y[:] = alpha * (A @ X) + beta * Y
+
     # -----------------------------------------------------------------------
     # Misc Routines
     # -----------------------------------------------------------------------

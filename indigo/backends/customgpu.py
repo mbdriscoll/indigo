@@ -1,5 +1,6 @@
 import numpy as np
 from ctypes import cdll
+import scipy.sparse as spp
 
 from indigo.backends.cuda import CudaBackend
 from indigo.backends import _customgpu
@@ -17,6 +18,14 @@ class CustomGpuBackend(CudaBackend):
             super(CustomGpuBackend, self).ccsrmm(
                 Y, A_shape, A_indx, A_ptr, A_vals, X, alpha, beta, adjoint, exwrite=exwrite
             )
+
+    def cdiamm(self, y, shape, offsets, data, x, alpha=1.0, beta=0.0, adjoint=True):
+        ldx = x._leading_dims[0]
+        ldy = y._leading_dims[0]
+        (K, N), M = x.shape, y.shape[0]
+        noffsets = offsets.size
+        _customgpu.diamm(M, N, K, noffsets, offsets._arr.value, data._arr.value,
+            alpha, x._arr.value, ldx, beta, y._arr.value, ldy, adjoint)
 
     def onemm(self, y, x, alpha, beta):
         ldx = x._leading_dims[0]

@@ -12,4 +12,11 @@ void c_onemm(
     complex float beta, complex float *Y, unsigned int ldy
 );
 
+void c_diamm(
+    unsigned int M, unsigned int N, unsigned int K,
+    unsigned int nOffsets, int *offsets, complex float *data,
+    complex float alpha, complex float *X, unsigned int ldx,
+    complex float beta, complex float *Y, unsigned int ldy, int adjoint
+);
+
 void c_max(unsigned int N, float val, float *arr);

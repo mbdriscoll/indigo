@@ -139,3 +139,58 @@ def test_Realize_One(backend, M, N):
     A = A.realize()
     assert isinstance(A, SpMatrix)
     assert np.all(A._matrix.data == 1)
+
+@pytest.mark.parametrize("backend,M,N",
+    list(product( BACKENDS, [3,4], [5,6]))
+)
+def test_SpyOut(backend, M, N):
+    matplotlib = pytest.importorskip('matplotlib')
+    matplotlib.use('Agg')
+    from indigo.operators import SpMatrix
+    from indigo.transforms import SpyOut
+    b = backend()
+    A = b.One((M,N)).realize()
+    SpyOut().visit(A)
+
+@pytest.mark.parametrize("backend,M,N",
+    list(product( BACKENDS, [3,4], [5,6]))
+)
+def test_GroupRLP(backend, M, N):
+    from indigo.operators import SpMatrix
+    from indigo.transforms import GroupRightLeaningProducts
+    b = backend()
+    A = b.One((M,N)).realize()
+    B = A * A.H * A
+    GroupRightLeaningProducts().visit(B)
+
+@pytest.mark.parametrize("backend,M,N",
+    list(product( BACKENDS, [3,4], [5,6]))
+)
+def test_MakeRL(backend, M, N):
+    from indigo.operators import SpMatrix
+    from indigo.transforms import MakeRightLeaning
+    b = backend()
+    A = b.One((M,N)).realize()
+    B = A * A.H * A
+    MakeRightLeaning().visit(B)
+
+@pytest.mark.parametrize("backend,M,N",
+    list(product( BACKENDS, [3,4], [5,6]))
+)
+def test_LiftUFFTS(backend, M, N):
+    from indigo.operators import SpMatrix
+    from indigo.transforms import LiftUnscaledFFTs
+    b = backend()
+    A = b.One((M,N)).realize()
+    B = b.KronI(3, A)
+    LiftUnscaledFFTs().visit(B)
+
+@pytest.mark.parametrize("backend,M,N",
+    list(product( BACKENDS, [3,4], [5,6]))
+)
+def test_LiftUFFTS2(backend, M, N):
+    from indigo.operators import SpMatrix
+    from indigo.transforms import LiftUnscaledFFTs
+    b = backend()
+    A = b.UnscaledFFT((M,N), dtype=np.complex64).realize().H
+    LiftUnscaledFFTs().visit(A)

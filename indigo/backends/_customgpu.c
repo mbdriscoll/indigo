@@ -57,6 +57,31 @@ py_onemm(PyObject *self, PyObject *args)
 }
 
 static PyObject*
+py_diamm(PyObject *self, PyObject *args)
+{
+    PyObject *py_alpha, *py_beta;
+    unsigned int ldx, ldy, M, N, K, nOffsets, adjoint;
+    unsigned long Y, X, offsets, data;
+    if (!PyArg_ParseTuple(args, "iiiikkOkiOkip",
+        &M, &N, &K, &nOffsets, &offsets, &data,
+        &py_alpha, &X, &ldx, &py_beta, &Y, &ldy, &adjoint))
+        return NULL;
+
+    float alpha_r = (float) PyComplex_RealAsDouble( py_alpha ),
+          alpha_i = (float) PyComplex_ImagAsDouble( py_alpha ),
+           beta_r = (float) PyComplex_RealAsDouble( py_beta  ),
+           beta_i = (float) PyComplex_ImagAsDouble( py_beta  );
+    complex float alpha = alpha_r + I * alpha_i,
+                   beta =  beta_r + I *  beta_i;
+
+    c_diamm(M, N, K, nOffsets, (int*) offsets, (complex float *) data,
+        alpha, (complex float *) X, ldx,
+        beta,  (complex float *) Y, ldy, adjoint);
+
+    Py_RETURN_NONE;
+}
+
+static PyObject*
 py_max(PyObject *self, PyObject *args)
 {
     float val;
@@ -73,6 +98,7 @@ py_max(PyObject *self, PyObject *args)
 static PyMethodDef _customgpuMethods[] = {
     { "exw_csrmm", py_exw_csrmm_H, METH_VARARGS, NULL },
     { "onemm", py_onemm, METH_VARARGS, NULL },
+    { "diamm", py_diamm, METH_VARARGS, NULL },
     { "max", py_max, METH_VARARGS, NULL },
     {NULL, NULL, 0, NULL} /* Sentinel */
 };

@@ -10,7 +10,6 @@ dependencies:
 - gcc=4.8.5=7
 - gmp=6.1.0=0
 - h5py=2.7.0=np112py35_0
-- isl=0.12.2=0
 - libgfortran=3.0.0=1
 - llvmlite=0.18.0=py35_0
 - mkl=2017.0.1=0
