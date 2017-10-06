@@ -88,7 +88,7 @@ class NumpyBackend(Backend):
             np.broadcast_to(x._arr.sum(axis=0, keepdims=True), y.shape)
 
     def normalize(self, x):
-        x._arr = x._arr / np.abs(x._arr)
+        x._arr[:] = x._arr / np.abs(x._arr)
 
     # -----------------------------------------------------------------------
     # FFT Routines
