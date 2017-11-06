@@ -507,12 +507,18 @@ class Backend(object):
 
         def forward(self, y, x, alpha=1, beta=0):
             """ y[:] = A * x """
+            assert x.dtype == np.dtype("complex64")
+            assert y.dtype == np.dtype("complex64")
+            assert self.values.dtype == np.dtype("complex64")
             self._backend.ccsrmm(y,
                 self.shape, self.colInds, self.rowPtrs, self.values,
                 x, alpha=alpha, beta=beta, adjoint=False, exwrite=True)
 
         def adjoint(self, y, x, alpha=1, beta=0):
             """ y[:] = A.H * x """
+            assert x.dtype == np.dtype("complex64")
+            assert y.dtype == np.dtype("complex64")
+            assert self.values.dtype == np.dtype("complex64")
             self._backend.ccsrmm(y,
                 self.shape, self.colInds, self.rowPtrs, self.values,
                 x, alpha=alpha, beta=beta, adjoint=True, exwrite=self._exwrite)

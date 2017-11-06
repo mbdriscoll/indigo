@@ -220,6 +220,7 @@ class SpMatrix(Operator):
 
     def _get_or_create_device_matrix(self):
         if self._matrix_d is None:
+            self._matrix = self._matrix.astype(np.complex64)
             assert self._matrix.dtype == np.dtype('complex64'), 'Indigo only supports single precision complex numbers for now.'
             if self._use_dia:
                 log.debug("storing in DIA format: %s", self._name)

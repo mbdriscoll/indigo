@@ -447,8 +447,8 @@ def test_only_complex64(backend, dtype):
     b = backend()
     M, N, K, density = 22, 33, 44, 0.50
     A0 = indigo.util.randM(M, N, density).astype(dtype)
-    x = indigo.util.rand64c(N,K)
-    y = indigo.util.rand64c(M,K)
+    x = b.copy_array( indigo.util.rand64c(N,K).astype(np.complex128) )
+    y = b.copy_array( indigo.util.rand64c(M,K).astype(np.complex128) )
     with pytest.raises(AssertionError):
         A = b.SpMatrix(A0).eval(y,x)
 
