@@ -321,6 +321,45 @@ class CudaBackend(Backend):
     ) -> cublasStatus_t:
         pass
 
+    def csymm(self, y, M, x, alpha, beta, forward=True, left=True):
+        assert isinstance(x, self.dndarray)
+        alpha = np.array(alpha, dtype=np.complex64)
+        beta  = np.array( beta, dtype=np.complex64)
+        (m, n), k = y.shape, x.shape[0]
+        lda = M.shape[0]
+        ldb = x.shape[0]
+        ldc = y.shape[0]
+        uplo = CudaBackend.cublasFillMode_t.UPPER
+        side = getattr(CudaBackend.cublasSideMode_t, 'LEFT' if left else 'RIGHT')
+        self.cublasCsymm_v2( self._cublas_handle, side, uplo,
+            m, n, alpha, M, lda, x, ldb, beta, y, ldc )
+
+    class cublasSideMode_t(c_uint):
+        LEFT  = 0
+        RIGHT = 1
+
+    class cublasFillMode_t(c_uint):
+        LOWER = 0
+        UPPER = 1
+
+    @wrap(cublas)
+    def cublasCsymm_v2(
+        handle : cublasHandle_t,
+        size   : cublasSideMode_t,
+        uplo   : cublasFillMode_t,
+        m      : c_int,
+        n      : c_int,
+        alpha  : ndpointer(dtype=np.complex64, ndim=0),
+        M      : dndarray,
+        lda    : c_int,
+        x      : dndarray,
+        ldb    : c_int,
+        beta   : ndpointer(dtype=np.complex64, ndim=0),
+        y      : dndarray,
+        ldc    : c_int,
+    ) -> cublasStatus_t:
+        pass
+
     # -----------------------------------------------------------------------
     # FFT Routines
     # -----------------------------------------------------------------------
