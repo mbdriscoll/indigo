@@ -197,6 +197,8 @@ class Adjoint(CompositeOperator):
         return self.child
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         self.child.eval( y, x, alpha, beta, forward=not forward, left=left)
 
 
@@ -250,6 +252,8 @@ class SpMatrix(Operator):
         return self._matrix_d
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         M = self._get_or_create_device_matrix()
         if forward:
             read_frac, write_frac = M._col_frac, M._row_frac
@@ -298,6 +302,8 @@ class DenseMatrix(Operator):
         return self._matrix_d
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         M_d = self._get_or_create_device_matrix()
         (m, n), k = M_d.shape, x.shape[1]
         nflops = m * n * k * 5
@@ -312,6 +318,8 @@ class UnscaledFFT(MatrixFreeOperator):
         super().__init__(backend, shape=(n,n), **kwargs)
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         assert alpha == 1 and beta == 0
         X = x.reshape( self._ft_shape + (x.shape[1],) )
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
@@ -348,6 +356,8 @@ class Eye(MatrixFreeOperator):
         super().__init__(backend, shape=(n,n), **kwargs)
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         nbytes = (0 if alpha == 0 else x.nbytes) + \
                  (0 if beta == 0 else y.nbytes)
         with profile("axpby", nbytes=nbytes) as p:
@@ -365,6 +375,8 @@ class KronI(CompositeOperator):
         return (self._c * h, self._c * w)
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         cb = self._c * x.shape[1]
         X = x.reshape( (x.size // cb, cb) )
         Y = y.reshape( (y.size // cb, cb) )
@@ -381,6 +393,8 @@ class BlockDiag(CompositeOperator):
         return h, w
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         h_offset, w_offset = 0, 0
         for C in self._children:
             h, w = C.shape if forward else reversed(C.shape)
@@ -401,6 +415,8 @@ class VStack(CompositeOperator):
         return h, w
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         if forward:
             return self._eval_forward(y, x, alpha, beta, left=left)
         else:
@@ -442,6 +458,8 @@ class HStack(CompositeOperator):
         return h, w
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         if forward:
             return self._eval_forward(y, x, alpha, beta, left=left)
         else:
@@ -501,6 +519,8 @@ class Product(CompositeOperator):
         super()._adopt(children)
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         L, R = self._children
         with self._backend.scratch(shape=(R.shape[0],x.shape[1])) as tmp:
             if forward:
@@ -541,6 +561,8 @@ class Sum(CompositeOperator):
         super()._adopt(children)
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         L, R = self._children
         R.eval(y, x, alpha=alpha, beta=beta, forward=forward, left=left)
         L.eval(y, x, alpha=alpha, beta=1.0,  forward=forward, left=left)
@@ -564,12 +586,16 @@ class Scale(CompositeOperator):
         return self.child.dtype
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         a = alpha * (self._val if forward else np.conj(self._val))
         self.child.eval(y, x, alpha=a, beta=beta, forward=forward, left=left)
 
 
 class One(MatrixFreeOperator):
     def _eval(self, y, x, alpha=1, beta=0, forward=None, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         nbytes = (0 if alpha == 0 else x.nbytes) + \
                  (0 if beta == 0 else y.nbytes)
         with profile("onemm", nbytes=nbytes) as p:

@@ -442,6 +442,12 @@ class Backend(object):
         """
         raise NotImplementedError()
 
+    def csymm(self, y, M, x, alpha, beta, forward, left, up):
+        """
+        Peform a symmetric dense matrix-matrix multiplication.
+        """
+        raise NotImplementedError()
+
     # -----------------------------------------------------------------------
     # FFT Routines
     # -----------------------------------------------------------------------
