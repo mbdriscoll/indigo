@@ -80,12 +80,26 @@ class NumpyBackend(Backend):
             MH = np.conj(M.T)
             y[:] = alpha * (MH @ x) + beta * y
 
+    def csymm(self, y, M, n, x, alpha, beta, forward=True, left=True):
+        x, y, M = x._arr, y._arr, M._arr
+        A = np.zeros((n,n), dtype=M.dtype) # make dense. easy but slow
+        for i in range(n):
+            for j in range(i+1):
+                A[i,j] = A[j,i] = M[int(j+i*(i+1)/2)]
+        if not forward:
+            A = np.conj(A.T)
+        if left:
+            y[:] = alpha * (A @ x) + beta * y
+        else:
+            y[:] = alpha * (x @ A) + beta * y
+
     # -----------------------------------------------------------------------
     # OneMM Routines
     # -----------------------------------------------------------------------
     def onemm(self, y, x, alpha, beta):
         y._arr[:] = beta * y._arr + alpha * \
             np.broadcast_to(x._arr.sum(axis=0, keepdims=True), y.shape)
+
     # -----------------------------------------------------------------------
     # FFT Routines
     # -----------------------------------------------------------------------

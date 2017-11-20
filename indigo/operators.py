@@ -277,9 +277,6 @@ class SpMatrix(Operator):
 
 class DenseMatrix(Operator):
     def __init__(self, backend, M, **kwargs):
-        """
-        Create a new Sparse Matrix Operator from a concrete sparse matrix.
-        """
         super().__init__(backend, **kwargs)
         assert isinstance(M, np.ndarray)
         assert M.dtype == np.dtype('complex64')
@@ -309,6 +306,38 @@ class DenseMatrix(Operator):
         nflops = m * n * k * 5
         with profile("cgemm", nflops=nflops):
             self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward)
+
+
+class SymDenseMatrix(Operator):
+    def __init__(self, backend, M, **kwargs):
+        super().__init__(backend, **kwargs)
+        assert isinstance(M, np.ndarray)
+        assert M.dtype == np.dtype('complex64')
+        assert M.ndim == 1
+        self._matrix = M
+        self._matrix_d = None
+
+    @property
+    def dtype(self):
+        return self._matrix.dtype
+
+    @property
+    def shape(self):
+        size = self._matrix.size
+        edge = int( (np.sqrt(1+8*size)-1) / 2 )
+        return (edge, edge)
+
+    def _get_or_create_device_matrix(self):
+        if self._matrix_d is None:
+            self._matrix_d = self._backend.copy_array( self._matrix )
+        return self._matrix_d
+
+    def _eval(self, y, x, alpha, beta, forward=True, left=True):
+        M_d = self._get_or_create_device_matrix()
+        (m, n), k = self.shape, x.shape[1]
+        nflops = m * n * k * 5
+        with profile("csymm", nflops=nflops):
+            self._backend.csymm(y, M_d, n, x, alpha, beta, forward=True, left=True)
 
 
 class UnscaledFFT(MatrixFreeOperator):

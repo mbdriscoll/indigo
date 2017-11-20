@@ -452,3 +452,65 @@ def test_only_complex64(backend, dtype):
     with pytest.raises(AssertionError):
         A = b.SpMatrix(A0).eval(y,x)
 
+
+@pytest.mark.parametrize("backend,m,k",
+    product(BACKENDS, [2, 4,5,6], [1,2,3])
+)
+def test_SymDenseMatrix_2d(backend, m, k):
+    b = backend()
+    data = indigo.util.rand64c(m,m)
+    data = data + data.T # make symmetric
+    M = b.SymDenseMatrix(data)
+
+    x = indigo.util.rand64c(m,k)
+
+    y_exp = np.dot(data, x)
+    y_act = M * x
+
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
+
+@pytest.mark.parametrize("backend,m",
+    product(BACKENDS, [4,5,6])
+)
+def test_SymDenseMatrix_notsym(backend, m):
+    b = backend()
+    data = indigo.util.rand64c(m,m)
+    with pytest.raises(AssertionError):
+        M = b.SymDenseMatrix(data)
+
+
+@pytest.mark.parametrize("backend,m",
+    product(BACKENDS, [4,5,6])
+)
+def test_SymDenseMatrix_notsquare(backend, m):
+    b = backend()
+    data = indigo.util.rand64c(m,m+1)
+    with pytest.raises(AssertionError):
+        M = b.SymDenseMatrix(data)
+
+
+@pytest.mark.parametrize("backend,m",
+    product(BACKENDS, [4,5,6])
+)
+def test_SymDenseMatrix_not1d2d(backend, m):
+    b = backend()
+    data = indigo.util.rand64c(m,m,2)
+    with pytest.raises(ValueError):
+        M = b.SymDenseMatrix(data)
+
+
+def test_SymDenseMatrix_formula():
+    formula = lambda x,y: int(y + x*(x+1)/2)
+    for k, (i,j) in [
+        (0, (0,0)),
+        (1, (1,0)),
+        (2, (1,1)),
+        (3, (2,0)),
+        (4, (2,1)),
+        (5, (2,2)),
+        (6, (3,0)),
+        (7, (3,1)),
+    ]:
+        k_exp = formula(i,j)
+        assert k == k_exp, (i,j)
+        
