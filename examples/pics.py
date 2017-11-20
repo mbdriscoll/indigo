@@ -22,6 +22,7 @@ parser.add_argument('-i', type=int, default=20, help='number of iterations')
 parser.add_argument('--backend', type=str, default='numpy', choices=['mkl', 'numpy', 'cuda', 'customcpu', 'customgpu'])
 parser.add_argument('--debug', type=int, default=logging.INFO, help='logging level')
 parser.add_argument('--crop', help='crop data before recon: --crop "COIL:2,TIME:4')
+parser.add_argument('--lamda', type=float, default=0, help='tikhonov reg parameter')
 parser.add_argument('-O', '--recipe', type=int, default=3, choices=range(5), help='optimization level')
 parser.add_argument('data', nargs='?', default="scan.h5", help='kspace data in an HDF file')
 args = parser.parse_args()
@@ -37,9 +38,9 @@ log.info("using backend: %s", type(B).__name__)
 
 # open input file
 hdf = h5py.File(args.data, 'r+')
-data = hdf['data']
-maps = hdf['maps']
-traj = hdf['traj']
+data = hdf['data'][:]
+maps = hdf['maps'][:]
+traj = hdf['traj'][:]
 
 # crop input data
 crops = [1e6] * dim.NDIM
@@ -83,9 +84,10 @@ slc[dim.READ] = slice(None)
 slc[dim.PHS1] = slice(None)
 slc[dim.PHS2] = slice(None)
 
+osf = (640/480, 640/480, 640/480) # uniform
 #osf = (640/480, 270/208, 432/308) # cpu
 #osf = (640/480, 288/208, 400/308) # knl
-osf = (600/480, 270/208, 392/308) # gpu
+#osf = (600/480, 270/208, 392/308) # gpu
 
 F1= B.NUFFT(ksp_nc_dims[:3], ksp_c_dims[:3], traj[slc], oversamp=osf, dtype=ksp.dtype)
 F = B.KronI(C, F1)
@@ -189,7 +191,7 @@ if args.recipe >= 4:
 
 A = A.optimize(recipe)
 
-AHA = A.H * A
+AHA = (A.H * A) + args.lamda * B.Eye(A.shape[1])
 AHA._name = 'SENSE'
 log.info("tree:\n%s", AHA.dump())
 
@@ -215,10 +217,15 @@ hdf.close()
 try:
     from scipy.misc import imsave
     slc = [slice(None)] * img.ndim
-    slc[dim.PHS2] = img.shape[dim.PHS2] // 2
     for t in range(T):
         slc[dim.TIME] = t
-        imsave("img_t%02d.jpg" % t, abs(img[slc].T.squeeze()))
+        im = img[slc].squeeze()
+        imf = im.flatten()
+        print("%f" % (sum(abs(imf))/len(imf)))
+        x2, y2, z2 = (np.array(im.shape) / 2).astype(int)
+        imsave("img_t%02d_x.jpg" % t, abs(im[x2,:,:]))
+        imsave("img_t%02d_y.jpg" % t, abs(im[:,y2,:]))
+        imsave("img_t%02d_z.jpg" % t, abs(im[:,:,z2]))
 except ImportError:
     log.warn("install PIL or Pillow to generate preview images.")
 

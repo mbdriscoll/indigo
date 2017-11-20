@@ -57,7 +57,15 @@ class Backend(object):
                 self._arr = data
 
         def reshape(self, new_shape):
-            assert -1 not in new_shape
+            if (-1) in new_shape:
+                one = new_shape.index(-1)
+                new_size = -int(np.prod(new_shape))
+                old_size = self.size
+                factor = old_size // new_size
+                assert new_size * factor == old_size, \
+                    "Cannot reshape {} into {}. (size mismatch)".format(self.shape, new_shape)
+                new_shape = list(new_shape)
+                new_shape[one] = factor
             assert np.prod(new_shape) == self.size
             return self._backend.dndarray( self._backend,
                 new_shape, dtype=self.dtype, own=False, data=self._arr)

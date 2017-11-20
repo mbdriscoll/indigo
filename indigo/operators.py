@@ -17,22 +17,33 @@ class Operator(object):
         self._batch = batch
         self._name = name
 
-    def eval(self, y, x, alpha=1, beta=0, forward=True):
-        """ y = A * x """
-        if x.ndim == 1: x = x.reshape( (x.shape[0], 1) )
-        if y.ndim == 1: y = y.reshape( (y.shape[0], 1) )
+    def eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        """
+        if left:
+            y = A * x
+        else:
+            y = x * A
+        """
         M, N = self.shape if forward else tuple(reversed(self.shape))
-        if x.shape[0] != N or \
-           y.shape[0] != M or \
-           x.shape[1] != y.shape[1]:
-            raise ValueError("Dimension mismatch: attemping {} = {} * {} ({}, {})".format(
-                y.shape, (M,N), x.shape, forward, type(self)))
-
-        batch_size = self._batch or x.shape[1]
-        for b in range(0, x.shape[1], batch_size):
-          x_slc = x[:,b:b+batch_size]
-          y_slc = y[:,b:b+batch_size]
-          self._eval(y_slc, x_slc, alpha=alpha, beta=beta, forward=forward)
+        if left: # left-multiply
+            x = x.reshape( (N,-1) )
+            y = y.reshape( (M,-1) )
+            batch_size = self._batch or x.shape[1]
+            if x.shape[0] != N or \
+               y.shape[0] != M or \
+               x.shape[1] != y.shape[1]:
+                raise ValueError("Dimension mismatch: attemping {} = {} * {} (forward={}, left={}, {})".format(
+                    y.shape, (M,N), x.shape, forward, left, type(self)))
+        else: # right-multiply
+            x = x.reshape( (M,-1) )
+            y = y.reshape( (N,-1) )
+            batch_size = self._batch or x.shape[0]
+            if x.shape[0] != M or \
+               y.shape[0] != N or \
+               x.shape[1] != y.shape[1]:
+                raise ValueError("Dimension mismatch: attemping {} = {} * {} (forward={}, left={}, {})".format(
+                    y.shape, x.shape, (M,N), forward, left, type(self)))
+        self._eval(y, x, alpha=alpha, beta=beta, forward=forward, left=left)
 
     @property
     def shape(self):
@@ -185,8 +196,8 @@ class Adjoint(CompositeOperator):
     def H(self):
         return self.child
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
-        self.child.eval( y, x, alpha, beta, forward=not forward)
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        self.child.eval( y, x, alpha, beta, forward=not forward, left=left)
 
 
 class SpMatrix(Operator):
@@ -238,7 +249,7 @@ class SpMatrix(Operator):
                     log.debug("allowing exwrite for %s" % self._name)
         return self._matrix_d
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         M = self._get_or_create_device_matrix()
         if forward:
             read_frac, write_frac = M._col_frac, M._row_frac
@@ -286,7 +297,7 @@ class DenseMatrix(Operator):
             self._matrix_d = self._backend.copy_array( self._matrix )
         return self._matrix_d
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         M_d = self._get_or_create_device_matrix()
         (m, n), k = M_d.shape, x.shape[1]
         nflops = m * n * k * 5
@@ -300,7 +311,7 @@ class UnscaledFFT(MatrixFreeOperator):
         n = np.prod(self._ft_shape)
         super().__init__(backend, shape=(n,n), **kwargs)
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         assert alpha == 1 and beta == 0
         X = x.reshape( self._ft_shape + (x.shape[1],) )
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
@@ -336,7 +347,7 @@ class Eye(MatrixFreeOperator):
     def __init__(self, backend, n, **kwargs):
         super().__init__(backend, shape=(n,n), **kwargs)
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         nbytes = (0 if alpha == 0 else x.nbytes) + \
                  (0 if beta == 0 else y.nbytes)
         with profile("axpby", nbytes=nbytes) as p:
@@ -353,11 +364,11 @@ class KronI(CompositeOperator):
         h, w = self.child.shape
         return (self._c * h, self._c * w)
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         cb = self._c * x.shape[1]
         X = x.reshape( (x.size // cb, cb) )
         Y = y.reshape( (y.size // cb, cb) )
-        self.child.eval(Y, X, alpha=alpha, beta=beta, forward=forward)
+        self.child.eval(Y, X, alpha=alpha, beta=beta, forward=forward, left=left)
 
 
 class BlockDiag(CompositeOperator):
@@ -369,13 +380,13 @@ class BlockDiag(CompositeOperator):
             w += child.shape[1]
         return h, w
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         h_offset, w_offset = 0, 0
         for C in self._children:
             h, w = C.shape if forward else reversed(C.shape)
             slc_x = slice( w_offset, w_offset+w )
             slc_y = slice( h_offset, h_offset+h )
-            C.eval( y[slc_y,:], x[slc_x,:], alpha=alpha, beta=beta, forward=forward)
+            C.eval( y[slc_y,:], x[slc_x,:], alpha=alpha, beta=beta, forward=forward, left=left)
             h_offset += h
             w_offset += w
 
@@ -389,27 +400,27 @@ class VStack(CompositeOperator):
             w  = child.shape[1]
         return h, w
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         if forward:
-            return self._eval_forward(y, x, alpha, beta)
+            return self._eval_forward(y, x, alpha, beta, left=left)
         else:
-            return self._eval_adjoint(y, x, alpha, beta)
+            return self._eval_adjoint(y, x, alpha, beta, left=left)
 
-    def _eval_forward(self, y, x, alpha=1, beta=0):
+    def _eval_forward(self, y, x, alpha=1, beta=0, left=True):
         h_offset = 0
         for C in self._children:
             h = C.shape[0]
             slc = slice( h_offset, h_offset+h )
-            C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=True)
+            C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=True, left=left)
             h_offset += h
 
-    def _eval_adjoint(self, y, x, alpha=1, beta=0):
+    def _eval_adjoint(self, y, x, alpha=1, beta=0, left=True):
         self._backend.scale(y, beta)
         w_offset = 0
         for C in self._children:
             w = C.shape[0]
             slc = slice( w_offset, w_offset+w )
-            C.eval( y, x[slc,:], alpha=alpha, beta=1, forward=False)
+            C.eval( y, x[slc,:], alpha=alpha, beta=1, forward=False, left=left)
             w_offset += w
 
     def _adopt(self, children):
@@ -430,27 +441,27 @@ class HStack(CompositeOperator):
             w += child.shape[1]
         return h, w
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         if forward:
-            return self._eval_forward(y, x, alpha, beta)
+            return self._eval_forward(y, x, alpha, beta, left=left)
         else:
-            return self._eval_adjoint(y, x, alpha, beta)
+            return self._eval_adjoint(y, x, alpha, beta, left=left)
 
-    def _eval_forward(self, y, x, alpha=1, beta=0):
+    def _eval_forward(self, y, x, alpha=1, beta=0, left=True):
         self._backend.scale(y, beta)
         w_offset = 0
         for C in self._children:
             w = C.shape[1]
             slc = slice( w_offset, w_offset+w )
-            C.eval( y, x[slc,:], alpha=alpha, beta=1, forward=True)
+            C.eval( y, x[slc,:], alpha=alpha, beta=1, forward=True, left=left)
             w_offset += w
 
-    def _eval_adjoint(self, y, x, alpha=1, beta=0):
+    def _eval_adjoint(self, y, x, alpha=1, beta=0, left=True):
         w_offset = 0
         for C in self._children:
             w = C.shape[1]
             slc = slice( w_offset, w_offset+w )
-            C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=False)
+            C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=False, left=left)
             w_offset += w
 
     def _adopt(self, children):
@@ -489,15 +500,15 @@ class Product(CompositeOperator):
                 L.shape, R.shape, L._name, R._name))
         super()._adopt(children)
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         L, R = self._children
         with self._backend.scratch(shape=(R.shape[0],x.shape[1])) as tmp:
             if forward:
-                R.eval(tmp, x, alpha=alpha, beta=0, forward=True)
-                L.eval(y, tmp, alpha=1,  beta=beta, forward=True)
+                R.eval(tmp, x, alpha=alpha, beta=0, forward=True, left=left)
+                L.eval(y, tmp, alpha=1,  beta=beta, forward=True, left=left)
             else:
-                L.eval(tmp, x, alpha=alpha, beta=0, forward=False)
-                R.eval(y, tmp, alpha=1,  beta=beta, forward=False)
+                L.eval(tmp, x, alpha=alpha, beta=0, forward=False, left=left)
+                R.eval(y, tmp, alpha=1,  beta=beta, forward=False, left=left)
 
     def _mem_usage(self, ncols):
         ncols = min(ncols, self._batch or ncols)
@@ -529,10 +540,10 @@ class Sum(CompositeOperator):
                 L.shape, R.shape, L._name, R._name))
         super()._adopt(children)
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         L, R = self._children
-        R.eval(y, x, alpha=alpha, beta=beta, forward=forward)
-        L.eval(y, x, alpha=alpha, beta=1.0,  forward=forward)
+        R.eval(y, x, alpha=alpha, beta=beta, forward=forward, left=left)
+        L.eval(y, x, alpha=alpha, beta=1.0,  forward=forward, left=left)
 
     def _mem_usage(self, ncols):
         return 0
@@ -552,13 +563,13 @@ class Scale(CompositeOperator):
     def dtype(self):
         return self.child.dtype
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         a = alpha * (self._val if forward else np.conj(self._val))
-        self.child.eval(y, x, alpha=a, beta=beta, forward=forward)
+        self.child.eval(y, x, alpha=a, beta=beta, forward=forward, left=left)
 
 
 class One(MatrixFreeOperator):
-    def _eval(self, y, x, alpha=1, beta=0, forward=None):
+    def _eval(self, y, x, alpha=1, beta=0, forward=None, left=True):
         nbytes = (0 if alpha == 0 else x.nbytes) + \
                  (0 if beta == 0 else y.nbytes)
         with profile("onemm", nbytes=nbytes) as p:
