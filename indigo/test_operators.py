@@ -570,3 +570,20 @@ def test_One(backend, M, N, K, alpha, beta, forward):
     O.eval(v_d, u_d, alpha=alpha, beta=beta, forward=forward)
     act = v_d.to_host()
     np.testing.assert_allclose(act, exp, rtol=1e-5)
+
+
+@pytest.mark.parametrize("backend,sym,m,k",
+    product(BACKENDS, [True,False], [2,4,5,6], [1,2,3])
+)
+def test_DenseMatrix_symmetric(backend, sym, m, k):
+    b = backend()
+    data = indigo.util.rand64c(m,m)
+    if sym:
+        data = np.asfortranarray(data + data.T) # make symmetric
+        data.imag = 0 # make imaginary
+    M = b.DenseMatrix(data)
+    assert (M._real_symmetric if sym else not M._real_symmetric)
+    x = indigo.util.rand64c(m,k)
+    y_exp = np.dot(data, x)
+    y_act = M * x
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-5)

@@ -202,6 +202,9 @@ class Backend(object):
         d_arr._zero()
         return d_arr
 
+    def zeros_like(self, other, name=''):
+        return self.zero_array(other.shape, other.dtype, name=name)
+
     def empty_array(self, shape, dtype, name=''):
         d_arr = self.dndarray(self, shape, dtype, name=name)
         return d_arr
@@ -266,31 +269,6 @@ class Backend(object):
         assert isinstance(M, np.ndarray)
         assert M.ndim == 2
         return op.DenseMatrix(self, M, **kwargs)
-
-    def SymDenseMatrix(self, M, **kwargs):
-        """
-        Symmetric dense matrix.
-        
-        Accepts two types of np arrays:
-        * 2D arrays are interpreted as matrices, checked for symmetry, and converted to symmetric format.
-        * 1D arrays are interpreted as matrices already in lower symmetric format.
-        """
-        assert isinstance(M, np.ndarray)
-        if M.ndim == 1:
-            data = M
-        elif M.ndim == 2:
-            np.testing.assert_allclose(M, M.T, err_msg="Matrix isn't symmetric.")
-            n = M.shape[0]
-            data = np.zeros( int(n*(n+1)/2), M.dtype )
-            for i in range(n):
-                for j in range(i+1):
-                    data[int(j+i*(i+1)/2)] = M[i,j]
-            print(M)
-            print(data)
-        else:
-            raise ValueError("SymDenseMatrix expected 1D or 2D matrix.")
-
-        return op.SymDenseMatrix(self, data, **kwargs)
 
     def Diag(self, v, **kwargs):
         """ A := diag(v) """
@@ -467,7 +445,7 @@ class Backend(object):
         """
         raise NotImplementedError()
 
-    def csymm(self, y, M, n, x, alpha, beta, forward=True, left=True):
+    def csymm(self, y, M, x, alpha, beta, forward=True, left=True):
         """
         Peform a symmetric dense matrix-matrix multiplication.
         """

@@ -80,18 +80,12 @@ class NumpyBackend(Backend):
             MH = np.conj(M.T)
             y[:] = alpha * (MH @ x) + beta * y
 
-    def csymm(self, y, M, n, x, alpha, beta, forward=True, left=True):
+    def csymm(self, y, M, x, alpha, beta, forward=True, left=True):
         x, y, M = x._arr, y._arr, M._arr
-        A = np.zeros((n,n), dtype=M.dtype) # make dense. easy but slow
-        for i in range(n):
-            for j in range(i+1):
-                A[i,j] = A[j,i] = M[int(j+i*(i+1)/2)]
-        if not forward:
-            A = np.conj(A.T)
         if left:
-            y[:] = alpha * (A @ x) + beta * y
+            y[:] = alpha * (M @ x) + beta * y
         else:
-            y[:] = alpha * (x @ A) + beta * y
+            y[:] = alpha * (x @ M) + beta * y
 
     # -----------------------------------------------------------------------
     # OneMM Routines

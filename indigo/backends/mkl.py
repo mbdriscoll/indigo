@@ -176,6 +176,47 @@ class MklBackend(Backend):
     ) -> c_void_p:
         pass
 
+    class CBlasSide(c_uint):
+        Left  = 141
+        Right = 142
+
+    class CBlasUplo(c_uint):
+        Upper = 121
+        Lower = 122
+
+    @wrap
+    def cblas_csymm(
+        layout: CBlasLayout,
+        side  : CBlasSide,
+        uplo  : CBlasUplo,
+        m     : c_int,
+        n     : c_int,
+        alpha : ndpointer(dtype=np.complex64, ndim=0),
+        a     : dndarray,
+        lda   : c_int,
+        b     : dndarray,
+        ldb   : c_int,
+        beta  : ndpointer(dtype=np.complex64, ndim=0),
+        c     : dndarray,
+        ldc   : c_int,
+    ) -> c_void_p:
+        pass
+
+    def csymm(self, y, M, x, alpha, beta, forward=True, left=True):
+        layout = MklBackend.CBlasLayout.ColMajor
+        side = MklBackend.CBlasSide.Left if left else MklBackend.CBlasSide.Right
+        uplo = MklBackend.CBlasUplo.Upper
+        (m, n), k = y.shape, x.shape[0]
+        alpha = np.array(alpha, dtype=np.complex64)
+        beta  = np.array( beta, dtype=np.complex64)
+        lda = M.shape[0]
+        ldb = x.shape[0]
+        ldc = y.shape[0]
+        self.cblas_csymm(
+            layout, side, uplo, m, n, alpha, M, lda,
+            x, ldb, beta, y, ldc
+        )
+
     @wrap
     def cblas_caxpby(
         n : c_int,

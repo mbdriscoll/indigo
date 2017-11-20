@@ -453,64 +453,34 @@ def test_only_complex64(backend, dtype):
         A = b.SpMatrix(A0).eval(y,x)
 
 
-@pytest.mark.parametrize("backend,m,k",
-    product(BACKENDS, [2, 4,5,6], [1,2,3])
+@pytest.mark.parametrize("backend,m,k,alpha,beta,forward,left",
+    product(BACKENDS, [2,4,5,6], [1,2,3],[0.0,0.5,1.0,1.5],[0.0,0.5,1.0,1.5],[True,False],[True,False])
 )
-def test_SymDenseMatrix_2d(backend, m, k):
+def test_csymm(backend, m, k, alpha, beta, forward, left):
     b = backend()
+
     data = indigo.util.rand64c(m,m)
-    data = data + data.T # make symmetric
-    M = b.SymDenseMatrix(data)
+    data = np.asfortranarray(data + data.T) # make symmetric
+    data.imag = 0 # make real
+    M = data
 
-    x = indigo.util.rand64c(m,k)
+    if left:
+        x = indigo.util.rand64c(m,k)
+        y = indigo.util.rand64c(m,k)
+    else:
+        x = indigo.util.rand64c(k,m)
+        y = indigo.util.rand64c(k,m)
 
-    y_exp = np.dot(data, x)
-    y_act = M * x
+    if left:
+        y_exp = alpha * (M @ x) + beta * y
+    else:
+        y_exp = alpha * (x @ M) + beta * y
 
+    M_d = b.copy_array(M)
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+
+    b.csymm(y_d, M_d, x_d, alpha, beta, forward, left)
+
+    y_act = y_d.to_host()
     np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
-
-@pytest.mark.parametrize("backend,m",
-    product(BACKENDS, [4,5,6])
-)
-def test_SymDenseMatrix_notsym(backend, m):
-    b = backend()
-    data = indigo.util.rand64c(m,m)
-    with pytest.raises(AssertionError):
-        M = b.SymDenseMatrix(data)
-
-
-@pytest.mark.parametrize("backend,m",
-    product(BACKENDS, [4,5,6])
-)
-def test_SymDenseMatrix_notsquare(backend, m):
-    b = backend()
-    data = indigo.util.rand64c(m,m+1)
-    with pytest.raises(AssertionError):
-        M = b.SymDenseMatrix(data)
-
-
-@pytest.mark.parametrize("backend,m",
-    product(BACKENDS, [4,5,6])
-)
-def test_SymDenseMatrix_not1d2d(backend, m):
-    b = backend()
-    data = indigo.util.rand64c(m,m,2)
-    with pytest.raises(ValueError):
-        M = b.SymDenseMatrix(data)
-
-
-def test_SymDenseMatrix_formula():
-    formula = lambda x,y: int(y + x*(x+1)/2)
-    for k, (i,j) in [
-        (0, (0,0)),
-        (1, (1,0)),
-        (2, (1,1)),
-        (3, (2,0)),
-        (4, (2,1)),
-        (5, (2,2)),
-        (6, (3,0)),
-        (7, (3,1)),
-    ]:
-        k_exp = formula(i,j)
-        assert k == k_exp, (i,j)
-        
