@@ -321,14 +321,14 @@ class CudaBackend(Backend):
     ) -> cublasStatus_t:
         pass
 
-    def csymm(self, y, M, x, alpha, beta, forward=True, left=True):
+    def csymm(self, y, M, x, alpha, beta, left=True):
         assert isinstance(x, self.dndarray)
         alpha = np.array(alpha, dtype=np.complex64)
         beta  = np.array( beta, dtype=np.complex64)
         (m, n), k = y.shape, x.shape[0]
-        lda = M.shape[0]
-        ldb = x.shape[0]
-        ldc = y.shape[0]
+        lda = M._leading_dims[0]
+        ldb = x._leading_dims[0]
+        ldc = y._leading_dims[0]
         uplo = CudaBackend.cublasFillMode_t.UPPER
         side = getattr(CudaBackend.cublasSideMode_t, 'LEFT' if left else 'RIGHT')
         self.cublasCsymm_v2( self._cublas_handle, side, uplo,

@@ -396,11 +396,10 @@ class Kron(BinaryOperator):
         if not left:
             raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         L, R = self.children
-        l0, l1 = L.shape
-        r0, r1 = R.shape
-        x = x.reshape((-1,l0))
-        x0, x1 = x.shape
-        with self._backend.scratch(shape=(x0,l1)) as tmp:
+        L_shape_eff = tuple(reversed(L.shape)) if forward else L.shape
+        x = x.reshape((-1, L_shape_eff[0]))
+        tmp_shape = (x.shape[0], L_shape_eff[1])
+        with self._backend.scratch(shape=tmp_shape) as tmp:
             if forward:
                 L.eval(tmp, x, alpha=alpha, beta=0,    forward=not forward, left=not left)
                 R.eval(y, tmp, alpha=1,     beta=beta, forward=forward,     left=left)

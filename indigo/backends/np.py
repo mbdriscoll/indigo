@@ -81,9 +81,8 @@ class NumpyBackend(Backend):
             y[:] = alpha * (MH @ x) + beta * y
 
     def csymm(self, y, M, x, alpha, beta, left=True):
-        x_shape, y_shape = x.shape, y.shape
-        x = x._arr.reshape(x_shape) # FIXME: reconcile shapes of dndarray and ndarray
-        y = y._arr#.reshape(y_shape)
+        x = x._arr.reshape(x.shape) # FIXME: reconcile shapes of dndarray and ndarray
+        y = y._arr
         M = M._arr
         if left:
             y[:] = alpha * (M @ x).reshape(y.shape) + beta * y

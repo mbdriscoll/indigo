@@ -202,16 +202,16 @@ class MklBackend(Backend):
     ) -> c_void_p:
         pass
 
-    def csymm(self, y, M, x, alpha, beta, forward=True, left=True):
+    def csymm(self, y, M, x, alpha, beta, left=True):
         layout = MklBackend.CBlasLayout.ColMajor
         side = MklBackend.CBlasSide.Left if left else MklBackend.CBlasSide.Right
         uplo = MklBackend.CBlasUplo.Upper
         (m, n), k = y.shape, x.shape[0]
         alpha = np.array(alpha, dtype=np.complex64)
         beta  = np.array( beta, dtype=np.complex64)
-        lda = M.shape[0]
-        ldb = x.shape[0]
-        ldc = y.shape[0]
+        lda = M._leading_dims[0]
+        ldb = x._leading_dims[0]
+        ldc = y._leading_dims[0]
         self.cblas_csymm(
             layout, side, uplo, m, n, alpha, M, lda,
             x, ldb, beta, y, ldc

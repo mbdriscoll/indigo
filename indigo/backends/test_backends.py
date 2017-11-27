@@ -480,7 +480,7 @@ def test_csymm(backend, m, k, alpha, beta, forward, left):
     x_d = b.copy_array(x)
     y_d = b.copy_array(y)
 
-    b.csymm(y_d, M_d, x_d, alpha, beta, forward, left)
+    b.csymm(y_d, M_d, x_d, alpha, beta, left)
 
     y_act = y_d.to_host()
     np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
