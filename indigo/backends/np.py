@@ -80,18 +80,15 @@ class NumpyBackend(Backend):
             MH = np.conj(M.T)
             y[:] = alpha * (MH @ x) + beta * y
 
-    def csymm(self, y, M, x, alpha, beta, forward=True, left=True):
+    def csymm(self, y, M, x, alpha, beta, left=True):
         x_shape, y_shape = x.shape, y.shape
         x = x._arr.reshape(x_shape) # FIXME: reconcile shapes of dndarray and ndarray
-        y = y._arr.reshape(y_shape)
-        M = M._arr if forward else np.conj(M._arr)
-
+        y = y._arr#.reshape(y_shape)
+        M = M._arr
         if left:
-            print("csymm", M.shape, x.shape)
-            y[:] = alpha * (M @ x) + beta * y
+            y[:] = alpha * (M @ x).reshape(y.shape) + beta * y
         else:
-            print("csymm", x.shape, M.shape)
-            y[:] = alpha * (x @ M) + beta * y
+            y[:] = alpha * (x @ M).reshape(y.shape) + beta * y
 
     # -----------------------------------------------------------------------
     # OneMM Routines

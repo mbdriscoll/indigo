@@ -34,7 +34,6 @@ class Operator(object):
         if x.shape[1] != y.shape[1]:
             raise ValueError("Dimension mismatch: attemping {} = {} * {} (forward={}, left={}, {})".format(
                 y.shape, x.shape, (M,N), forward, left, type(self)))
-        print("ll eval %s = %s * %s (forward %s, left %s)" % (y.shape, self.shape, x.shape, forward, left))
         self._eval(y, x, alpha=alpha, beta=beta, forward=forward, left=left)
 
     @property
@@ -301,13 +300,13 @@ class DenseMatrix(Operator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         if not left and not self._real_symmetric:
-            raise NotImplementedError("Right-multiplication not implemented for nonsymmetric {}.".format(self.__class__.__name__))
+            raise NotImplementedError("Right-multiplication not implemented for non-real-symmetric {}.".format(self.__class__.__name__))
         M_d = self._get_or_create_device_matrix()
         (m, n), k = M_d.shape, x.shape[1]
         nflops = m * n * k * 5
         if self._real_symmetric:
             with profile("csymm", nflops=nflops/2):
-                self._backend.csymm(y, M_d, x, alpha, beta, forward=forward, left=left)
+                self._backend.csymm(y, M_d, x, alpha, beta, left=left)
         else:
             with profile("cgemm", nflops=nflops):
                 self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward)
@@ -394,20 +393,20 @@ class Kron(BinaryOperator):
         return (h,w)
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         L, R = self.children
-        print("evaling %s = (%s)=(%s KRON %s) * %s" % \
-            (y.shape, self.shape, self.left_child.shape, self.right_child.shape, x.shape))
         l0, l1 = L.shape
         r0, r1 = R.shape
-        with self._backend.scratch(shape=(r1,l1)) as tmp:
+        x = x.reshape((-1,l0))
+        x0, x1 = x.shape
+        with self._backend.scratch(shape=(x0,l1)) as tmp:
             if forward:
-                print("as  %s = %s * (%s)^H" % (tmp.shape, x.shape, L.shape))
-                L.eval(tmp, x, alpha=alpha, beta=beta, forward=not forward, left=not left)
-                print("and %s = (%s)^H * %s" % (y.shape, R.shape, tmp.shape))
-                R.eval(y, tmp, alpha=alpha, beta=beta, forward=forward, left=left)
+                L.eval(tmp, x, alpha=alpha, beta=0,    forward=not forward, left=not left)
+                R.eval(y, tmp, alpha=1,     beta=beta, forward=forward,     left=left)
             else:
-                L.eval(tmp, x, alpha=alpha, beta=beta, forward=forward, left=not left)
-                R.eval(y, tmp, alpha=alpha, beta=beta, forward=not forward, left=left)
+                L.eval(tmp, x, alpha=alpha, beta=0,    forward=forward,     left=not left)
+                R.eval(y, tmp, alpha=1,     beta=beta, forward=not forward, left=left)
 
 
 class BlockDiag(CompositeOperator):

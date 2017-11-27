@@ -449,9 +449,9 @@ class Backend(object):
         """
         raise NotImplementedError()
 
-    def csymm(self, y, M, x, alpha, beta, forward=True, left=True):
+    def csymm(self, y, M, x, alpha, beta, left=True):
         """
-        Peform a symmetric dense matrix-matrix multiplication.
+        Peform a symmetric dense matrix-matrix multiplication for real symmetric matrices.
         """
         raise NotImplementedError()
 
