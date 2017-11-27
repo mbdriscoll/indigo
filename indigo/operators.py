@@ -28,12 +28,11 @@ class Operator(object):
         if left: # left-multiply
             x = x.reshape( (N,-1) )
             y = y.reshape( (M,-1) )
+            assert x.shape[1] == y.shape[1], "Dimension mismatch"
         else: # right-multiply
             x = x.reshape( (-1,M) )
             y = y.reshape( (-1,N) )
-        if x.shape[1] != y.shape[1]:
-            raise ValueError("Dimension mismatch: attemping {} = {} * {} (forward={}, left={}, {})".format(
-                y.shape, x.shape, (M,N), forward, left, type(self)))
+            assert x.shape[0] == y.shape[0], "Dimension mismatch"
         self._eval(y, x, alpha=alpha, beta=beta, forward=forward, left=left)
 
     @property
@@ -283,7 +282,8 @@ class DenseMatrix(Operator):
         assert M.ndim == 2
         self._matrix = M
         self._matrix_d = None
-        self._real_symmetric = np.allclose(M, M.T) and np.allclose(M.imag, 0)
+        self._real_symmetric = M.shape[0] == M.shape[1] and \
+            np.allclose(M.imag, 0) and np.allclose(M, M.T)
 
     @property
     def dtype(self):
@@ -304,12 +304,12 @@ class DenseMatrix(Operator):
         M_d = self._get_or_create_device_matrix()
         (m, n), k = M_d.shape, x.shape[1]
         nflops = m * n * k * 5
-        if self._real_symmetric:
+        if False and self._real_symmetric:
             with profile("csymm", nflops=nflops/2):
                 self._backend.csymm(y, M_d, x, alpha, beta, left=left)
         else:
             with profile("cgemm", nflops=nflops):
-                self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward)
+                self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward, left=left)
 
 
 class UnscaledFFT(MatrixFreeOperator):
@@ -381,7 +381,7 @@ class KronI(CompositeOperator):
         cb = self._c * x.shape[1]
         X = x.reshape( (x.size // cb, cb) )
         Y = y.reshape( (y.size // cb, cb) )
-        self.child.eval(Y, X, alpha=alpha, beta=beta, forward=forward, left=left)
+        self.child.eval(Y, X, alpha=alpha, beta=beta, forward=forward)
 
 
 class Kron(BinaryOperator):
@@ -401,7 +401,10 @@ class Kron(BinaryOperator):
         tmp_shape = (x.shape[0], L_shape_eff[1])
         with self._backend.scratch(shape=tmp_shape) as tmp:
             if forward:
+                # (L \kron R) * vec(X) = R * (X * L^T)
+                # tmp = X * L^T
                 L.eval(tmp, x, alpha=alpha, beta=0,    forward=not forward, left=not left)
+                # y = R * tmp
                 R.eval(y, tmp, alpha=1,     beta=beta, forward=forward,     left=left)
             else:
                 L.eval(tmp, x, alpha=alpha, beta=0,    forward=forward,     left=not left)

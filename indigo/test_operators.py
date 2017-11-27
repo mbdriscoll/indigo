@@ -589,10 +589,10 @@ def test_DenseMatrix_symmetric(backend, sym, m, k):
     np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
 
 
-@pytest.mark.parametrize("backend,L,Q,K,density,alpha,beta,eyeL,eyeR",
-    product( BACKENDS, [3,4], [5,6],  [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1],
+@pytest.mark.parametrize("backend,L,Q,K,alpha,beta,eyeL,eyeR",
+    product( BACKENDS, [3,4], [5,6],  [1,8,9,17], [0,.5,1], [0,.5,1],
             [True, False], [True, False] ))
-def test_Kron_general(backend, L, Q,  K, density, alpha, beta, eyeL, eyeR):
+def test_Kron_general(backend, L, Q,  K, alpha, beta, eyeL, eyeR):
     b = backend()
 
     if eyeL:
@@ -618,11 +618,11 @@ def test_Kron_general(backend, L, Q,  K, density, alpha, beta, eyeL, eyeR):
     # forward
     x = indigo.util.rand64c(A.shape[1],K)
     y = indigo.util.rand64c(A.shape[0],K)
+    y_exp = alpha * (A @ x) + beta * y
     x_d = b.copy_array(x)
     y_d = b.copy_array(y)
     M.eval(y_d, x_d, alpha=alpha, beta=beta)
     y_act = y_d.to_host()
-    y_exp = alpha * (A @ x) + beta * y
     npt.assert_allclose(y_act, y_exp, rtol=1e-5)
 
     # adjoint
@@ -636,6 +636,7 @@ def test_Kron_general(backend, L, Q,  K, density, alpha, beta, eyeL, eyeR):
     npt.assert_allclose(y_act, y_exp, rtol=1e-5)
 
     return
+
     # forward - right hand side
     x = indigo.util.rand64c(K,A.shape[1])
     y = indigo.util.rand64c(K,A.shape[0])

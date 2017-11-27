@@ -72,22 +72,19 @@ class NumpyBackend(Backend):
         assert isinstance(x, self.dndarray)
         x._arr *= alpha
 
-    def cgemm(self, y, M, x, alpha, beta, forward):
-        x, y, M = x._arr, y._arr, M._arr
-        if forward:
-            y[:] = alpha * (M @ x) + beta * y
+    def cgemm(self, y, M, x, alpha=1, beta=0, forward=True, left=True):
+        # FIXME: reconcile shapes of dndarray and ndarray
+        x = np.asfortranarray(x._arr).reshape(x.shape)
+        y, M = y._arr, M._arr
+        if not forward:
+            M = np.conj(M.T)
+        if left:
+            y[:] = alpha * np.asfortranarray(M @ x).reshape(y.shape) + beta * y
         else:
-            MH = np.conj(M.T)
-            y[:] = alpha * (MH @ x) + beta * y
+            y[:] = alpha * np.asfortranarray(x @ M).reshape(y.shape) + beta * y
 
     def csymm(self, y, M, x, alpha, beta, left=True):
-        x = x._arr.reshape(x.shape) # FIXME: reconcile shapes of dndarray and ndarray
-        y = y._arr
-        M = M._arr
-        if left:
-            y[:] = alpha * (M @ x).reshape(y.shape) + beta * y
-        else:
-            y[:] = alpha * (x @ M).reshape(y.shape) + beta * y
+        return self.cgemm(y, M, x, alpha, beta, forward=True, left=left)
 
     # -----------------------------------------------------------------------
     # OneMM Routines
