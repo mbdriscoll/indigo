@@ -589,21 +589,25 @@ def test_DenseMatrix_symmetric(backend, sym, m, k):
     np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
 
 
-@pytest.mark.parametrize("backend,L,Q,K,density,alpha,beta",
-    product( BACKENDS, [3,4], [5,6],  [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
+@pytest.mark.parametrize("backend,L,Q,K,density,alpha,beta,eyeL,eyeR",
+    product( BACKENDS, [3,4], [5,6],  [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1],
+            [True, False], [True, False] ))
 def test_Kron_general(backend, L, Q,  K, density, alpha, beta):
     b = backend()
 
-    A0 = indigo.util.rand64c(L,L)
-    A0 = A0 + A0.T
-    A0.imag = 0
+    if eyeL:
+        A0 = np.eye(L, dtype=np.complex64)
+    else:
+        A0 = indigo.util.rand64c(L,L)
+        A0 = A0 + A0.T
+        A0.imag = 0
 
-    A1 = indigo.util.rand64c(Q,Q)
-    A1 = A1 + A1.T
-    A1.imag = 0
-
-    A0 = np.eye(L, dtype=A1.dtype)
-    A1 = np.eye(Q, dtype=A1.dtype)
+    if eyeR:
+        A1 = np.eye(L, dtype=np.complex64)
+    else:
+        A1 = indigo.util.rand64c(Q,Q)
+        A1 = A1 + A1.T
+        A1.imag = 0
 
     A = np.kron(A0, A1)
     M = b.Kron(
