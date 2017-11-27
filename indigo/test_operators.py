@@ -587,3 +587,64 @@ def test_DenseMatrix_symmetric(backend, sym, m, k):
     y_exp = np.dot(data, x)
     y_act = M * x
     np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
+
+
+@pytest.mark.parametrize("backend,L,Q,K,density,alpha,beta",
+    product( BACKENDS, [3,4], [5,6],  [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
+def test_Kron_general(backend, L, Q,  K, density, alpha, beta):
+    b = backend()
+
+    A0 = indigo.util.rand64c(L,L)
+    A0 = A0 + A0.T
+    A0.imag = 0
+
+    A1 = indigo.util.rand64c(Q,Q)
+    A1 = A1 + A1.T
+    A1.imag = 0
+
+    A = np.kron(A0, A1)
+    M = b.Kron(
+        b.DenseMatrix(A0),
+        b.DenseMatrix(A1),
+    )
+
+    # forward
+    x = indigo.util.rand64c(A.shape[1],K)
+    y = indigo.util.rand64c(A.shape[0],K)
+    y_exp = alpha * (A @ x) + beta * y
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    M.eval(y_d, x_d, alpha=alpha, beta=beta)
+    y_act = y_d.to_host()
+    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+
+    # adjoint
+    x = indigo.util.rand64c(A.shape[0],K)
+    y = indigo.util.rand64c(A.shape[1],K)
+    y_exp = alpha * (np.conj(A.T) @ x) + beta * y
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    M.H.eval(y_d, x_d, alpha=alpha, beta=beta)
+    y_act = y_d.to_host()
+    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+
+    # forward - right hand side
+    x = indigo.util.rand64c(K,A.shape[1])
+    y = indigo.util.rand64c(K,A.shape[0])
+    y_exp = alpha * (x @ A) + beta * y
+    A_d = b.DenseMatrix(A)
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    M.eval(y_d, x_d, alpha=alpha, beta=beta, left=False)
+    y_act = y_d.to_host()
+    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+
+    # adjoint - right hand side
+    x = indigo.util.rand64c(K, A.shape[0])
+    y = indigo.util.rand64c(K, A.shape[1])
+    y_exp = alpha * (x @ np.conj(A.T)) + beta * y
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+    M.H.eval(y_d, x_d, alpha=alpha, beta=beta, left=False)
+    y_act = y_d.to_host()
+    npt.assert_allclose(y_act, y_exp, rtol=1e-5)

@@ -287,6 +287,10 @@ class Backend(object):
         """ C := I_c (KRON) B """
         return op.KronI(self, c, B, **kwargs)
 
+    def Kron(self, A, B, **kwargs):
+        """ C := A (KRON) B """
+        return op.Kron(self, A, B, **kwargs)
+
     def BlockDiag(self, Ms, **kwargs):
         return op.BlockDiag(self, *Ms, **kwargs)
 
