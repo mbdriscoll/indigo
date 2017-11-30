@@ -505,6 +505,7 @@ class HStack(CompositeOperator):
 
     def _eval_adjoint(self, y, x, alpha=1, beta=0, left=True):
         w_offset = 0
+        print("hstack.H %s [%s] = %s * %s [%s]" % (y.shape, y._leading_dims, self.shape[::-1], x.shape, x._leading_dims))
         for C in self._children:
             w = C.shape[1]
             slc = slice( w_offset, w_offset+w )

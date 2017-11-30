@@ -12,6 +12,7 @@ class CustomGpuBackend(CudaBackend):
             (M, K), N = A_shape, X.shape[1]
             ldx = X._leading_dims[0]
             ldy = Y._leading_dims[0]
+            print('csrmm %s [%s] = %s * %s [%s]' % (Y.shape, Y._leading_dims, A_shape, X.shape, X._leading_dims))
             _customgpu.exw_csrmm(M, N, K, alpha, A_vals._arr.value, A_indx._arr.value, A_ptr._arr.value,
                 X._arr.value, ldx, beta, Y._arr.value, ldy)
         else:
