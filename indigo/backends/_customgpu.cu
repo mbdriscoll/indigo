@@ -196,6 +196,5 @@ void c_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
     int tpb = 128;
     int nb = (M+tpb-1)/tpb;
     int ns = N * tpb * sizeof(cuFloatComplex);
-    printf("m n k %d %d %d\n", M, N, K); fflush(stdout);
     cu_exw_csrmm_H<<<nb,tpb,ns>>>(M, N, K, alpha, values, colInds, rowPtrs, X, ldx, beta, Y, ldy);
 }

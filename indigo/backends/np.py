@@ -73,15 +73,17 @@ class NumpyBackend(Backend):
         x._arr *= alpha
 
     def cgemm(self, y, M, x, alpha=1, beta=0, forward=True, left=True):
-        # FIXME: reconcile shapes of dndarray and ndarray
-        x = np.asfortranarray(x._arr).reshape(x.shape)
-        y, M = y._arr, M._arr
+        y, M, x = y._arr, M._arr, x._arr
         if not forward:
             M = np.conj(M.T)
         if left:
-            y[:] = alpha * np.asfortranarray(M @ x).reshape(y.shape) + beta * y
+            x = x.reshape((M.shape[1],-1), order='F')
+            y = y.reshape((M.shape[0],-1), order='F')
+            y[:] = alpha * (M @ x) + beta * y
         else:
-            y[:] = alpha * np.asfortranarray(x @ M).reshape(y.shape) + beta * y
+            x = x.reshape((-1,M.shape[0]), order='F')
+            y = y.reshape((-1,M.shape[1]), order='F')
+            y[:] = alpha * (x @ M) + beta * y
 
     def csymm(self, y, M, x, alpha, beta, left=True):
         return self.cgemm(y, M, x, alpha, beta, forward=True, left=left)

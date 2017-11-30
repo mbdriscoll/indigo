@@ -66,10 +66,9 @@ class MklBackend(Backend):
             self._arr[:] = 0
 
         def __getitem__(self, slc):
-            ld = self._leading_dims
-            d = self._arr.reshape(self.shape, order='F')[slc]
+            d = self._arr[slc]
             return self._backend.dndarray( self._backend, d.shape, d.dtype,
-                ld=ld, own=False, data=d )
+                ld=self._leading_dims, own=False, data=d )
 
         def to_host(self):
             return self._arr
@@ -412,8 +411,11 @@ class MklBackend(Backend):
             transA[0] = b'C'
         else:
             transA[0] = b'N' 
+
         ldx = np.array(x._leading_dims[0], dtype=np.int32)
         ldy = np.array(y._leading_dims[0], dtype=np.int32)
+
+        print("csrmm %s (%s) = %s * %s (%s)" % (y.shape, y._leading_dims, A_shape, x.shape, x._leading_dims))
 
         A_ptrb = A_ptr[:-1]
         A_ptre = A_ptr[1:]

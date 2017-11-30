@@ -304,12 +304,12 @@ class DenseMatrix(Operator):
         M_d = self._get_or_create_device_matrix()
         (m, n), k = M_d.shape, x.shape[1]
         nflops = m * n * k * 5
-        if False and self._real_symmetric:
+        if self._real_symmetric:
             with profile("csymm", nflops=nflops/2):
-                self._backend.csymm(y, M_d, x, alpha, beta, left=left)
+                self._backend.csymm(y, M_d, x, alpha=alpha, beta=beta, left=left)
         else:
             with profile("cgemm", nflops=nflops):
-                self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward, left=left)
+                self._backend.cgemm(y, M_d, x, alpha=alpha, beta=beta, forward=forward, left=left)
 
 
 class UnscaledFFT(MatrixFreeOperator):
@@ -396,9 +396,10 @@ class Kron(BinaryOperator):
         if not left:
             raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         L, R = self.children
-        L_shape_eff = tuple(reversed(L.shape)) if forward else L.shape
-        x = x.reshape((-1, L_shape_eff[0]))
-        tmp_shape = (x.shape[0], L_shape_eff[1])
+        if forward:
+            tmp_shape = R.shape[1], L.shape[1]
+        else:
+            tmp_shape = R.shape[0], L.shape[0]
         with self._backend.scratch(shape=tmp_shape) as tmp:
             if forward:
                 # (L \kron R) * vec(X) = R * (X * L^T)

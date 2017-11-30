@@ -66,9 +66,10 @@ class Backend(object):
                     "Cannot reshape {} into {}. (size mismatch)".format(self.shape, new_shape)
                 new_shape = list(new_shape)
                 new_shape[one] = factor
+                new_shape = tuple(new_shape)
             assert np.prod(new_shape) == self.size
             return self._backend.dndarray( self._backend,
-                new_shape, dtype=self.dtype, own=False, data=self._arr)
+                new_shape, dtype=self.dtype, ld=self._leading_dims, own=False, data=self._arr)
 
         @property
         def size(self):
