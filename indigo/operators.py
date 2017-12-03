@@ -378,10 +378,7 @@ class KronI(CompositeOperator):
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         if not left:
             raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
-        cb = self._c * x.shape[1]
-        X = x.reshape( (x.size // cb, cb) )
-        Y = y.reshape( (y.size // cb, cb) )
-        self.child.eval(Y, X, alpha=alpha, beta=beta, forward=forward)
+        self.child.eval(y, x, alpha=alpha, beta=beta, forward=forward)
 
 
 class Kron(BinaryOperator):
@@ -505,7 +502,6 @@ class HStack(CompositeOperator):
 
     def _eval_adjoint(self, y, x, alpha=1, beta=0, left=True):
         w_offset = 0
-        print("hstack.H %s [%s] = %s * %s [%s]" % (y.shape, y._leading_dims, self.shape[::-1], x.shape, x._leading_dims))
         for C in self._children:
             w = C.shape[1]
             slc = slice( w_offset, w_offset+w )

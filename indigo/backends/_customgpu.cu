@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <cublas.h>
+#include <cublas_v2.h>
 #include <cuComplex.h>
 
 //#include "_customgpu.h"
@@ -180,21 +180,37 @@ void c_diamm(
 }
 
 extern "C"
-void c_exw_csrmm_H(unsigned int M, unsigned int N, unsigned int K,
+void c_exw_csrmm_H(cublasHandle_t handle,
+    unsigned int M, unsigned int N, unsigned int K,
     cuFloatComplex alpha, cuFloatComplex *values,
     unsigned int *colInds, unsigned int *rowPtrs,
     cuFloatComplex *X, unsigned int ldx, cuFloatComplex beta,
     cuFloatComplex *Y, unsigned int ldy)
 {
     // Y[:] *= beta
-    if (cuCrealf(beta) == 0 && cuCimagf(beta) == 0)
-        cudaMemset(Y, 0, K*N*sizeof(cuFloatComplex));
-    else
-        cublasCscal(K*N, beta, Y, 1);
+#if 0
+    int contig = (ldy == K);
+    int zero = (cuCrealf(beta) == 0 && cuCimagf(beta) == 0);
+    if (contig) {
+        if (zero)
+            cudaMemset(Y, 0, K*N*sizeof(cuFloatComplex));
+        else
+            cublasCscal(handle, K*N, &beta, Y, 1);
+    } else {
+        for (int n = 0; n < N; n++)
+            if (zero)
+                cudaMemset(&Y[n*ldy], 0, K*sizeof(cuFloatComplex));
+            else
+                cublasCscal(handle, K, &beta, &Y[n*ldy], 1);
+    }
+#else
+    for (int n = 0; n < N; n++)
+        cublasCscal(handle, K, &beta, &Y[n*ldy], 1);
+#endif
 
     // Y[:] += alpha*A*X
-    int tpb = 128;
-    int nb = (M+tpb-1)/tpb;
-    int ns = N * tpb * sizeof(cuFloatComplex);
+    unsigned int tpb = 128;
+    unsigned int nb = (M+tpb-1)/tpb;
+    unsigned int ns = tpb * N * sizeof(cuFloatComplex);
     cu_exw_csrmm_H<<<nb,tpb,ns>>>(M, N, K, alpha, values, colInds, rowPtrs, X, ldx, beta, Y, ldy);
 }

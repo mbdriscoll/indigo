@@ -12,11 +12,12 @@
 static PyObject*
 py_exw_csrmm_H(PyObject *self, PyObject *args)
 {
+    void *cublasHandle;
     PyObject *py_alpha, *py_beta;
     unsigned int ldx, ldy, M, N, K;
     unsigned long rowPtrs, colInds, values, X, Y;
-    if (!PyArg_ParseTuple(args, "iiiOkkkkiOki",
-        &M, &N, &K, &py_alpha,
+    if (!PyArg_ParseTuple(args, "kiiiOkkkkiOki",
+        &cublasHandle, &M, &N, &K, &py_alpha,
         &values, &colInds, &rowPtrs,
         &X, &ldx, &py_beta, &Y, &ldy))
         return NULL;
@@ -28,7 +29,7 @@ py_exw_csrmm_H(PyObject *self, PyObject *args)
     complex float alpha = alpha_r + I * alpha_i,
                    beta =  beta_r + I *  beta_i;
 
-    c_exw_csrmm_H(M, N, K, alpha, (complex float*) values, (unsigned int *) colInds, (unsigned int *) rowPtrs, (complex float *) X, ldx, beta, (complex float *) Y, ldy);
+    c_exw_csrmm_H(cublasHandle, M, N, K, alpha, (complex float*) values, (unsigned int *) colInds, (unsigned int *) rowPtrs, (complex float *) X, ldx, beta, (complex float *) Y, ldy);
 
     Py_RETURN_NONE;
 }

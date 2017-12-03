@@ -166,7 +166,7 @@ class CudaBackend(Backend):
             idx = np.ravel_multi_index(start, self.shape, order='F')
             ptr = self._arr.value + idx * np.dtype(self.dtype).itemsize
             ptr = c_ulong(ptr)
-            ld = self._leading_dims
+            ld = self._leading_dim
             return self._backend.dndarray(self._backend, tuple(shape),
                 self.dtype, ld=ld, own=False, data=ptr)
 
@@ -326,9 +326,9 @@ class CudaBackend(Backend):
         alpha = np.array(alpha, dtype=np.complex64)
         beta  = np.array( beta, dtype=np.complex64)
         (m, n), k = y.shape, x.shape[0]
-        lda = M._leading_dims[0]
-        ldb = x._leading_dims[0]
-        ldc = y._leading_dims[0]
+        lda = M._leading_dim
+        ldb = x._leading_dim
+        ldc = y._leading_dim
         uplo = CudaBackend.cublasFillMode_t.UPPER
         side = getattr(CudaBackend.cublasSideMode_t, 'LEFT' if left else 'RIGHT')
         self.cublasCsymm_v2( self._cublas_handle, side, uplo,
@@ -551,8 +551,8 @@ class CudaBackend(Backend):
     def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, exwrite=False):
         m, k = A_shape
         n = x.shape[1]
-        ldx = x._leading_dims[0]
-        ldy = y._leading_dims[0]
+        ldx = x._leading_dim
+        ldy = y._leading_dim
         if adjoint:
             trans = self.CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
         else:

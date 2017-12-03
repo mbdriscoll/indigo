@@ -37,7 +37,7 @@ class NumpyBackend(Backend):
 
         def __getitem__(self, slc):
             d = self._arr.reshape(self.shape, order='F')[slc]
-            ld = self._leading_dims
+            ld = self._leading_dim
             return self._backend.dndarray( self._backend, d.shape, d.dtype,
                 ld=ld, own=False, data=d)
 

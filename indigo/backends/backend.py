@@ -47,7 +47,7 @@ class Backend(object):
             self.dtype = dtype
             self.shape = shape
             self._backend = backend
-            self._leading_dims = ld or shape
+            self._leading_dim = ld or shape[0]
             self._own = own
             assert isinstance(backend, Backend), type(backend)
             if data is None:
@@ -57,19 +57,24 @@ class Backend(object):
                 self._arr = data
 
         def reshape(self, new_shape):
+            old_shape = self.shape
+            old_leading_dim = self._leading_dim
             if (-1) in new_shape:
                 one = new_shape.index(-1)
                 new_size = -int(np.prod(new_shape))
                 old_size = self.size
                 factor = old_size // new_size
                 assert new_size * factor == old_size, \
-                    "Cannot reshape {} into {}. (size mismatch)".format(self.shape, new_shape)
+                    "Cannot reshape {} into {}. (size mismatch)".format(old_shape, new_shape)
                 new_shape = list(new_shape)
                 new_shape[one] = factor
                 new_shape = tuple(new_shape)
+            if new_shape[0] > old_shape[0]:
+                contig = old_shape[0] == self._leading_dim
+                assert contig, "Cannot stack non-contiguous columns."
             assert np.prod(new_shape) == self.size
             return self._backend.dndarray( self._backend,
-                new_shape, dtype=self.dtype, ld=self._leading_dims, own=False, data=self._arr)
+                new_shape, dtype=self.dtype, ld=old_leading_dim, own=False, data=self._arr)
 
         @property
         def size(self):

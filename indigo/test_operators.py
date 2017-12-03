@@ -211,7 +211,7 @@ def test_KronI(backend, stack, M, N, K, density, alpha, beta):
     # adjoint
     x = b.rand_array((A.shape[0],K))
     y = b.rand_array((A.shape[1],K))
-    y_exp = beta * y.to_host() + alpha * A_h.H @ x.to_host()
+    y_exp = beta * y.to_host() + alpha * np.conj(A_h.T) @ x.to_host()
     A.H.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 

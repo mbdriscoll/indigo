@@ -68,7 +68,7 @@ class MklBackend(Backend):
         def __getitem__(self, slc):
             d = self._arr[slc]
             return self._backend.dndarray( self._backend, d.shape, d.dtype,
-                ld=self._leading_dims, own=False, data=d )
+                ld=self._leading_dim, own=False, data=d )
 
         def to_host(self):
             return self._arr
@@ -208,9 +208,9 @@ class MklBackend(Backend):
         (m, n), k = y.shape, x.shape[0]
         alpha = np.array(alpha, dtype=np.complex64)
         beta  = np.array( beta, dtype=np.complex64)
-        lda = M._leading_dims[0]
-        ldb = x._leading_dims[0]
-        ldc = y._leading_dims[0]
+        lda = M._leading_dim
+        ldb = x._leading_dim
+        ldc = y._leading_dim
         self.cblas_csymm(
             layout, side, uplo, m, n, alpha, M, lda,
             x, ldb, beta, y, ldc
@@ -412,10 +412,8 @@ class MklBackend(Backend):
         else:
             transA[0] = b'N' 
 
-        ldx = np.array(x._leading_dims[0], dtype=np.int32)
-        ldy = np.array(y._leading_dims[0], dtype=np.int32)
-
-        print("csrmm %s (%s) = %s * %s (%s)" % (y.shape, y._leading_dims, A_shape, x.shape, x._leading_dims))
+        ldx = np.array(x._leading_dim, dtype=np.int32)
+        ldy = np.array(y._leading_dim, dtype=np.int32)
 
         A_ptrb = A_ptr[:-1]
         A_ptre = A_ptr[1:]
@@ -480,8 +478,8 @@ class MklBackend(Backend):
 
     def cdiamm(self, y, shape, offsets, data, x, alpha=1.0, beta=0.0, adjoint=False):
         transA = create_string_buffer(b'N' if adjoint else b'C', size=1)
-        ldx = np.array(x._leading_dims[0], dtype=np.int32)
-        ldy = np.array(y._leading_dims[0], dtype=np.int32)
+        ldx = np.array(x._leading_dim, dtype=np.int32)
+        ldy = np.array(y._leading_dim, dtype=np.int32)
 
         m     = np.array(shape[0],   dtype=np.int32)
         n     = np.array(x.shape[1], dtype=np.int32)
