@@ -357,28 +357,10 @@ class Eye(MatrixFreeOperator):
         super().__init__(backend, shape=(n,n), **kwargs)
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
-        if not left:
-            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         nbytes = (0 if alpha == 0 else x.nbytes) + \
                  (0 if beta == 0 else y.nbytes)
         with profile("axpby", nbytes=nbytes) as p:
             self._backend.axpby(beta, y, alpha, x)
-
-
-class KronI(CompositeOperator):
-    def __init__(self, backend, c, *args, **kwargs):
-        super().__init__(backend, *args, **kwargs)
-        self._c = c
-
-    @property
-    def shape(self):
-        h, w = self.child.shape
-        return (self._c * h, self._c * w)
-
-    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
-        if not left:
-            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
-        self.child.eval(y, x, alpha=alpha, beta=beta, forward=forward)
 
 
 class Kron(BinaryOperator):
@@ -393,20 +375,32 @@ class Kron(BinaryOperator):
         if not left:
             raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         L, R = self.children
+        print("kron y(%s) = (%s x %s) * x(%s)" % (y.shape, L.shape, R.shape, x.shape), forward)
         if forward:
-            tmp_shape = R.shape[1], L.shape[1]
+            os = x.shape
+            x = x.reshape( (-1, L.shape[1]) )
+            print("reshape x from %s to %s" % (os, x.shape))
+            os = y.shape
+            y = y.reshape( (-1, L.shape[0]) )
+            print("reshape y from %s to %s" % (os, y.shape))
+            tmp_shape = (x.shape[0], L.shape[0])
         else:
-            tmp_shape = R.shape[0], L.shape[0]
+            x = x.reshape( (-1, L.shape[0]) )
+            y = y.reshape( (-1, L.shape[1]) )
+            tmp_shape = (x.shape[0], L.shape[1])
         with self._backend.scratch(shape=tmp_shape) as tmp:
             if forward:
-                # (L \kron R) * vec(X) = R * (X * L^T)
-                # tmp = X * L^T
-                L.eval(tmp, x, alpha=alpha, beta=0,    forward=not forward, left=not left)
-                # y = R * tmp
-                R.eval(y, tmp, alpha=1,     beta=beta, forward=forward,     left=left)
+                print()
+                print("l eval", tmp.shape, '=', x.shape, list(reversed(L.shape)))
+                print("r eval", y.shape, '=', R.shape, tmp.shape)
+                L.eval(tmp, x, alpha=alpha, beta=0,    forward=False, left=not left)
+                R.eval(y, tmp, alpha=1,     beta=beta, forward=True,  left=left)
             else:
-                L.eval(tmp, x, alpha=alpha, beta=0,    forward=forward,     left=not left)
-                R.eval(y, tmp, alpha=1,     beta=beta, forward=not forward, left=left)
+                print()
+                print("l eval", tmp.shape, '=', x.shape, L.shape)
+                print("r eval", y.shape, '=', list(reversed(R.shape)), tmp.shape)
+                L.eval(tmp, x, alpha=alpha, beta=0,    forward=True,  left=not left)
+                R.eval(y, tmp, alpha=1,     beta=beta, forward=False, left=left)
 
 
 class BlockDiag(CompositeOperator):

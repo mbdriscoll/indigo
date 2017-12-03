@@ -291,7 +291,8 @@ class Backend(object):
 
     def KronI(self, c, B, **kwargs):
         """ C := I_c (KRON) B """
-        return op.KronI(self, c, B, **kwargs)
+        I = self.Eye(c)
+        return op.Kron(self, I, B, **kwargs)
 
     def Kron(self, A, B, **kwargs):
         """ C := A (KRON) B """

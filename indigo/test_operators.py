@@ -84,7 +84,7 @@ def test_Product(backend, L, M, N, K, density, alpha, beta):
 
 
 @pytest.mark.parametrize("backend,stack,M,N,K,density,alpha,beta",
-    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,4,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,1,0.5] ))
+    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,4,8,9,17], [0.1,0.5,1], [0,.5,1], [0,1,0.5] ))
 def test_VStack(backend, stack, M, N, K, density, alpha, beta):
     b = backend()
     mats_h = [indigo.util.randM(M,N,density) for i in range(stack)]
@@ -191,15 +191,15 @@ def test_Eye(backend, M, K):
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
 
-@pytest.mark.parametrize("backend,stack,M,N,K,density,alpha,beta",
-    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
-def test_KronI(backend, stack, M, N, K, density, alpha, beta):
+@pytest.mark.parametrize("backend,M,N,K,density,alpha,beta",
+    product( BACKENDS, [5,6], [7,8], [1,8,9,17], [0.9,0.5,1], [0,.5,1], [0,.5,1] ))
+def test_KronI(backend, M, N, K, density, alpha, beta):
     b = backend()
     mat_h = indigo.util.randM(M,N,density)
-    A_h = spp.kron( spp.eye(stack), mat_h )
+    A_h = spp.kron( spp.eye(K), mat_h )
 
     mat_d = b.SpMatrix(mat_h)
-    A = b.KronI(stack, mat_d)
+    A = b.KronI(K, mat_d)
 
     # forward
     x = b.rand_array((A.shape[1],K))
@@ -216,8 +216,8 @@ def test_KronI(backend, stack, M, N, K, density, alpha, beta):
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # shape
-    assert A.shape == (M*stack,N*stack)
-    assert A.H.shape == (N*stack,M*stack)
+    assert A.shape == (M*K,N*K)
+    assert A.H.shape == (N*K,M*K)
 
     # dtype
     assert A.dtype == np.dtype('complex64')
