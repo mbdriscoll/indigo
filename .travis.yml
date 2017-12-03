@@ -18,7 +18,7 @@ install:
 - wget -O scan.h5 "https://drive.google.com/uc?export=download&id=0B3gFEmaelkOoZEtvU19reklkamM"
 
 script:
-- pytest --cov=indigo
+- pytest --cov=indigo -v
 
 after_success:
   - coveralls
