@@ -133,20 +133,20 @@ class DistKroniOverFFT(Transform):
     def visit_Kron(self, node):
         L, R = node.children
         if isinstance(L, Eye) and isinstance(R, Product) and node.has(UnscaledFFT):
-            kl = node._backend.Kron( L, R.left_child )
-            kr = node._backend.Kron( L, R.right_child )
+            kl = node._backend.Kron( L, R.left )
+            kr = node._backend.Kron( L, R.right )
             return self.visit(kl * kr)
         else:
             return node
 
 class AssocSpMatrices(Transform):
     def visit_Product(self, node):
-        l = self.visit(node.left_child)
-        r = self.visit(node.right_child)
+        l = self.visit(node.left)
+        r = self.visit(node.right)
 
         try:
-            rl = r.left_child
-            rr = r.right_child
+            rl = r.left
+            rr = r.right
             if isinstance(l, SpMatrix) and not isinstance(rl, UnscaledFFT):
                 return (l*rl) * rr
         except (AttributeError, AssertionError):
@@ -156,22 +156,22 @@ class AssocSpMatrices(Transform):
     
 class MakeRightLeaning(Transform):
     def visit_Product(self, node):
-        l = self.visit(node.left_child)
-        r = self.visit(node.right_child)
+        l = self.visit(node.left)
+        r = self.visit(node.right)
         if isinstance(l, Product):
-            ll = l.left_child
-            lr = l.right_child
+            ll = l.left
+            lr = l.right
             return self.visit(ll*(lr*r))
         else:
             return l*r
 
 class MakeLeftLeaning(Transform):
     def visit_Product(self, node):
-        l = self.visit(node.left_child)
-        r = self.visit(node.right_child)
+        l = self.visit(node.left)
+        r = self.visit(node.right)
         if isinstance(r, Product):
-            rl = r.left_child
-            rr = r.right_child
+            rl = r.left
+            rr = r.right
             return self.visit((l*rl)*rr)
         else:
             return l*r

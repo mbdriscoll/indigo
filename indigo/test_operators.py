@@ -597,17 +597,23 @@ def test_Kron_general(backend, L, Q, alpha, beta, eyeL, eyeR):
 
     if eyeL:
         A = np.eye(L, dtype=np.complex64)
+        A_d = b.Eye(L)
+        if not eyeR: A_d._eval = lambda unreachable: ()
     else:
         A = indigo.util.rand64c(L,L)
+        A_d = b.DenseMatrix(A)
 
     if eyeR:
         B = np.eye(Q, dtype=np.complex64)
+        B_d = b.Eye(Q)
+        if not eyeL: B_d._eval = lambda unreachable: ()
     else:
         B = indigo.util.rand64c(Q,Q)
         B = B + B.T
         B.imag = 0
+        B_d = b.DenseMatrix(B)
 
-    K = b.Kron( b.DenseMatrix(B.T), b.DenseMatrix(A) )
+    K = b.Kron( B_d, A_d )
     vec = lambda arr: arr.reshape((-1,1), order='F')
 
     # check

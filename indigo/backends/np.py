@@ -54,7 +54,7 @@ class NumpyBackend(Backend):
         """ y = beta*y + alpha*x """
         assert isinstance(x, self.dndarray)
         assert isinstance(y, self.dndarray)
-        x = x._arr.reshape(y.shape, order='F')
+        x = x._arr.reshape(y._arr.shape, order='F')
         y._arr[:] = beta * y._arr + alpha * x
 
     def dot(self, x, y):

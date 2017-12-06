@@ -78,8 +78,8 @@ def test_DistributeKroniOverProd(backend):
     z = b.KronI(2, x*y)
     z2 = DistributeKroniOverProd().visit(z)
     assert isinstance(z2, Product)
-    assert isinstance(z2.left_child, Kron)
-    assert isinstance(z2.right_child, Kron)
+    assert isinstance(z2.left, Kron)
+    assert isinstance(z2.right, Kron)
 
 
 @pytest.mark.parametrize("backend", BACKENDS )
@@ -92,8 +92,8 @@ def test_DistributeAdjointOverProd(backend):
     z = b.Adjoint(x*y)
     z2 = DistributeAdjointOverProd().visit(z)
     assert isinstance(z2, Product)
-    assert isinstance(z2.left_child, Adjoint)
-    assert isinstance(z2.right_child, Adjoint)
+    assert isinstance(z2.left, Adjoint)
+    assert isinstance(z2.right, Adjoint)
 
 
 @pytest.mark.parametrize("backend", BACKENDS )

@@ -131,10 +131,12 @@ class RealizeMatrices(Transform):
         else:
             return node
 
-    def visit_KronI(self, node):
-        """ KronI(c, SpMatrix) => SpMatrix """
+    def visit_Kron(self, node):
+        """ Kron(I, SpMatrix) => SpMatrix """
         node = self.generic_visit(node)
         L, R = node.children
+        if isinstance(L, Eye):
+            L = L.realize()
         if isinstance(L, SpMatrix) and isinstance(R, SpMatrix):
             name = "({}(x){})".format(L._name, R._name)
             log.debug('realizing kron %s x %s', L._name, R._name)
@@ -179,8 +181,8 @@ class DistributeKroniOverProd(Transform):
         node = self.generic_visit(node)
         L, R = node.children
         if isinstance(L, Eye) and isinstance(R, Product):
-            kl = node._backend.Kron( L, R.left_child )
-            kr = node._backend.Kron( L, R.right_child )
+            kl = node._backend.Kron( L, R.left )
+            kr = node._backend.Kron( L, R.right )
             return self.visit(kl * kr)
         else:
             return node
@@ -202,10 +204,10 @@ class LiftUnscaledFFTs(Transform):
         node = self.generic_visit(node)
         if isinstance(node, Product):
             l, r = node.children
-            if isinstance(l, Product) and l.left_child.has(UnscaledFFT):
+            if isinstance(l, Product) and l.left.has(UnscaledFFT):
                 ll, lr = l.children
                 node = ll * self.visit(lr*r)
-            elif isinstance(r, Product) and r.right_child.has(UnscaledFFT):
+            elif isinstance(r, Product) and r.right.has(UnscaledFFT):
                 rl, rr = r.children
                 node = self.visit(l*rl) * rr
         return self.generic_visit(node)
@@ -213,20 +215,21 @@ class LiftUnscaledFFTs(Transform):
     def visit_Adjoint(self, node):
         node = self.generic_visit(node)
         if isinstance(node.child, Product):
-            node = node.child.right_child.H * node.child.left_child.H
+            node = node.child.right.H * node.child.left.H
         return self.generic_visit(node)
 
-    def visit_KronI(self, node):
+    def visit_Kron(self, node):
         node = self.generic_visit(node)
-        if isinstance(node.child, Product):
-            node = node._backend.KronI(node._c, node.child.left_child) * \
-                   node._backend.KronI(node._c, node.child.right_child)
+        L, R = node.children
+        if isinstance(L, Eye) and isinstance(R, Product):
+            node = node._backend.Kron(L, node.child.left) * \
+                   node._backend.Kron(L, node.child.right)
         return self.generic_visit(node)
 
 class MakeRightLeaning(Transform):
     def visit_Product(self, node):
         node = self.generic_visit(node)
-        if isinstance(node, Product) and isinstance(node.left_child, Product):
+        if isinstance(node, Product) and isinstance(node.left, Product):
             l, r = node.children
             ll, lr = l.children
             return ll * self.visit(lr*r)

@@ -132,16 +132,6 @@ class CompositeOperator(Operator):
     def children(self):
         return self._children
 
-    @property
-    def left_child(self):
-        assert len(self._children) == 2
-        return self._children[0]
-
-    @property
-    def right_child(self):
-        assert len(self._children) == 2
-        return self._children[1]
-
     def _adopt(self, children):
         self._children = children
 
@@ -380,19 +370,23 @@ class Kron(BinaryOperator):
         R_shape = R.shape if forward else R.shape[::-1]
         L_shape = L.shape if forward else L.shape[::-1]
 
-        x = x.reshape( (-1, L_shape[0]) )
-        y = y.reshape( (-1, L_shape[1]) )
-        tmp_shape = (x.shape[0], L_shape[1])
-
-        with self._backend.scratch(shape=tmp_shape) as tmp:
-            if forward:
-                L.eval(tmp, x, alpha=alpha, beta=0,    forward=not forward, left=not left)
-                tmp = tmp.reshape( (R_shape[1], -1) )
-                R.eval(y, tmp, alpha=1,     beta=beta, forward=forward,     left=left)
-            else:
-                L.eval(tmp, x, alpha=alpha, beta=0,    forward=forward,     left=not left)
-                tmp = tmp.reshape( (R_shape[1], -1) )
-                R.eval(y, tmp, alpha=1,     beta=beta, forward=forward, left=left)
+        if isinstance(L, Eye):
+            R.eval(y, x, alpha=alpha, beta=beta, forward=forward, left=left)
+        elif isinstance(R, Eye):
+            L.eval(y, x, alpha=alpha, beta=beta, forward=forward, left=not left)
+        else:
+            x = x.reshape( (-1, L_shape[0]) )
+            y = y.reshape( (-1, L_shape[1]) )
+            tmp_shape = (x.shape[0], L_shape[1])
+            with self._backend.scratch(shape=tmp_shape) as tmp:
+                if forward:
+                    L.eval(tmp, x, alpha=alpha, beta=0,    forward=not forward, left=not left)
+                    tmp = tmp.reshape( (R_shape[1], -1) )
+                    R.eval(y, tmp, alpha=1,     beta=beta, forward=forward,     left=left)
+                else:
+                    L.eval(tmp, x, alpha=alpha, beta=0,    forward=forward,     left=not left)
+                    tmp = tmp.reshape( (R_shape[1], -1) )
+                    R.eval(y, tmp, alpha=1,     beta=beta, forward=forward, left=left)
 
 
 class BlockDiag(CompositeOperator):
