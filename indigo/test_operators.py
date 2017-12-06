@@ -380,7 +380,7 @@ def test_zpad(backend, batch, x, y, z, px, py, pz):
 
     b = backend()
     A = b.Zpad( M[:3], N[:3], dtype=v.dtype )
-    
+
     # check adjoint
     u_d = b.copy_array(u.reshape((-1,batch), order='F'))
     v_d = b.copy_array(v.reshape((-1,batch), order='F'))
@@ -557,7 +557,7 @@ def test_One(backend, M, N, K, alpha, beta, forward):
     if not hasattr(B, 'onemm'):
         pytest.skip("backend doesn't implement onemm")
     O = B.One((M,K), dtype=np.complex64)
- 
+
     if forward:
         u, v = x, y
     else:

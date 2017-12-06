@@ -309,7 +309,7 @@ class DenseMatrix(Operator):
                 self._backend.csymm(y, M_d, x, alpha=alpha, beta=beta, left=left)
         else:
             with profile("cgemm", nflops=nflops):
-                self._backend.cgemm(y, M_d, x, alpha=alpha, beta=beta, forward=forward, left=left)
+                self._backend.cgemm(y, M_d, x, alpha=alpha, beta=beta, forward=forward)
 
 
 class UnscaledFFT(MatrixFreeOperator):

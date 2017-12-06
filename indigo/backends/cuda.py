@@ -127,28 +127,43 @@ class CudaBackend(Backend):
         def _copy_from(self, arr):
             assert arr.flags['F_CONTIGUOUS']
             src, dst = arr.ctypes.data, self._arr
-            spitch = arr.shape[0] * arr.dtype.itemsize
-            dpitch = self._leading_dim * self.itemsize
-            width, height = self.shape[0] * self.dtype.itemsize, self.shape[1]
-            self._backend.cudaMemcpy2D(dst, dpitch, src, spitch, width, height,
-                CudaBackend.cudaMemcpy.HostToDevice)
+            if self.ndim == 2:
+                spitch = arr.shape[0] * arr.dtype.itemsize
+                dpitch = self._leading_dim * self.itemsize
+                width, height = self.shape[0] * self.dtype.itemsize, self.shape[1]
+                self._backend.cudaMemcpy2D(dst, dpitch, src, spitch, width, height,
+                    CudaBackend.cudaMemcpy.HostToDevice)
+            else:
+                assert self.contiguous
+                size, kind = arr.nbytes, CudaBackend.cudaMemcpy.HostToDevice
+                self._backend.cudaMemcpy(dst, src, size, kind)
 
         def _copy_to(self, arr):
             assert arr.flags['F_CONTIGUOUS']
             src, dst = self._arr, arr.ctypes.data
-            spitch = self._leading_dim * self.itemsize
-            dpitch = arr.shape[0] * arr.dtype.itemsize
-            width, height = self.shape[0] * self.dtype.itemsize, self.shape[1]
-            self._backend.cudaMemcpy2D(dst, dpitch, src, spitch, width, height,
-                CudaBackend.cudaMemcpy.DeviceToHost)
+            if self.ndim == 2:
+                spitch = self._leading_dim * self.itemsize
+                dpitch = arr.shape[0] * arr.dtype.itemsize
+                width, height = self.shape[0] * self.dtype.itemsize, self.shape[1]
+                self._backend.cudaMemcpy2D(dst, dpitch, src, spitch, width, height,
+                    CudaBackend.cudaMemcpy.DeviceToHost)
+            else:
+                assert self.contiguous
+                size, kind = arr.nbytes, CudaBackend.cudaMemcpy.DeviceToHost
+                self._backend.cudaMemcpy(dst, src, size, kind)
 
         def _copy(self, d_arr):
             src, dst = d_arr._arr, self._arr
-            spitch = d_arr._leading_dim * d_arr.itemsize
-            dpitch =  self._leading_dim *  self.itemsize
-            width, height = self.shape[0] * self.dtype.itemsize, self.shape[1]
-            self._backend.cudaMemcpy2D(dst, dpitch, src, spitch, width, height,
-                CudaBackend.cudaMemcpy.DeviceToDevice)
+            if self.ndim == 2:
+                spitch = d_arr._leading_dim * d_arr.itemsize
+                dpitch =  self._leading_dim *  self.itemsize
+                width, height = self.shape[0] * self.dtype.itemsize, self.shape[1]
+                self._backend.cudaMemcpy2D(dst, dpitch, src, spitch, width, height,
+                    CudaBackend.cudaMemcpy.DeviceToDevice)
+            else:
+                assert self.contiguous
+                size, kind = arr.nbytes, CudaBackend.cudaMemcpy.DeviceToDevice
+                self._backend.cudaMemcpy(dst, src, size, kind)
 
         def _malloc(self, shape, dtype):
             align = 256
