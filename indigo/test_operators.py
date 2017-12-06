@@ -599,8 +599,6 @@ def test_Kron_general(backend, L, Q, alpha, beta, eyeL, eyeR):
         A = np.eye(L, dtype=np.complex64)
     else:
         A = indigo.util.rand64c(L,L)
-        A = A + A.T
-        A.imag = 0
 
     if eyeR:
         B = np.eye(Q, dtype=np.complex64)

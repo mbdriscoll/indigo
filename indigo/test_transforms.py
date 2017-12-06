@@ -70,7 +70,7 @@ def test_Realize_BlockDiag(backend):
 
 @pytest.mark.parametrize("backend", BACKENDS )
 def test_DistributeKroniOverProd(backend):
-    from indigo.operators import Product, KronI
+    from indigo.operators import Product, Kron
     from indigo.transforms import DistributeKroniOverProd
     b = backend()
     x = b.Eye(4)
@@ -78,8 +78,8 @@ def test_DistributeKroniOverProd(backend):
     z = b.KronI(2, x*y)
     z2 = DistributeKroniOverProd().visit(z)
     assert isinstance(z2, Product)
-    assert isinstance(z2.left_child, KronI)
-    assert isinstance(z2.right_child, KronI)
+    assert isinstance(z2.left_child, Kron)
+    assert isinstance(z2.right_child, Kron)
 
 
 @pytest.mark.parametrize("backend", BACKENDS )
@@ -178,7 +178,6 @@ def test_MakeRL(backend, M, N):
     list(product( BACKENDS, [3,4], [5,6]))
 )
 def test_LiftUFFTS(backend, M, N):
-    from indigo.operators import SpMatrix
     from indigo.transforms import LiftUnscaledFFTs
     b = backend()
     A = b.One((M,N)).realize()

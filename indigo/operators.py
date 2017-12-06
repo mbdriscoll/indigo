@@ -375,32 +375,24 @@ class Kron(BinaryOperator):
         if not left:
             raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         L, R = self.children
-        print("kron y(%s) = (%s x %s) * x(%s)" % (y.shape, L.shape, R.shape, x.shape), forward)
-        if forward:
-            os = x.shape
-            x = x.reshape( (-1, L.shape[1]) )
-            print("reshape x from %s to %s" % (os, x.shape))
-            os = y.shape
-            y = y.reshape( (-1, L.shape[0]) )
-            print("reshape y from %s to %s" % (os, y.shape))
-            tmp_shape = (x.shape[0], L.shape[0])
-        else:
-            x = x.reshape( (-1, L.shape[0]) )
-            y = y.reshape( (-1, L.shape[1]) )
-            tmp_shape = (x.shape[0], L.shape[1])
+
+        # transpose-corrected shapes
+        R_shape = R.shape if forward else R.shape[::-1]
+        L_shape = L.shape if forward else L.shape[::-1]
+
+        x = x.reshape( (-1, L_shape[0]) )
+        y = y.reshape( (-1, L_shape[1]) )
+        tmp_shape = (x.shape[0], L_shape[1])
+
         with self._backend.scratch(shape=tmp_shape) as tmp:
             if forward:
-                print()
-                print("l eval", tmp.shape, '=', x.shape, list(reversed(L.shape)))
-                print("r eval", y.shape, '=', R.shape, tmp.shape)
-                L.eval(tmp, x, alpha=alpha, beta=0,    forward=False, left=not left)
-                R.eval(y, tmp, alpha=1,     beta=beta, forward=True,  left=left)
+                L.eval(tmp, x, alpha=alpha, beta=0,    forward=not forward, left=not left)
+                tmp = tmp.reshape( (R_shape[1], -1) )
+                R.eval(y, tmp, alpha=1,     beta=beta, forward=forward,     left=left)
             else:
-                print()
-                print("l eval", tmp.shape, '=', x.shape, L.shape)
-                print("r eval", y.shape, '=', list(reversed(R.shape)), tmp.shape)
-                L.eval(tmp, x, alpha=alpha, beta=0,    forward=True,  left=not left)
-                R.eval(y, tmp, alpha=1,     beta=beta, forward=False, left=left)
+                L.eval(tmp, x, alpha=alpha, beta=0,    forward=forward,     left=not left)
+                tmp = tmp.reshape( (R_shape[1], -1) )
+                R.eval(y, tmp, alpha=1,     beta=beta, forward=forward, left=left)
 
 
 class BlockDiag(CompositeOperator):

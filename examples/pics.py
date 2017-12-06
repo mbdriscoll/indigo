@@ -94,10 +94,12 @@ F = B.KronI(C, F1)
 S = B.VStack([B.Diag(mps[:,:,:,c:c+1]) for c in range(C)], name='maps')
 A = F * S; A._name = 'SENSE1'
 
+import scipy.sparse as spp
 
 from indigo.transforms import Transform, Visitor
-from indigo.operators import Product, UnscaledFFT, SpMatrix, VStack, KronI
-import scipy.sparse as spp
+from indigo.operators import (
+    Product, UnscaledFFT, SpMatrix, VStack, Eye, Kron
+)
 
 class MriGoodAdjoints(Transform):
     def visit_SpMatrix(self, node):
@@ -117,7 +119,7 @@ class MriRealize(Transform):
 
     def visit_Product(self, node):
         l, r = node.children
-        if isinstance(r, VStack) and isinstance(l, KronI):
+        if isinstance(r, VStack) and isinstance(l, Kron):
             return node.realize()
 
         node = self.generic_visit(node)
@@ -128,12 +130,11 @@ class MriRealize(Transform):
             return node
 
 class DistKroniOverFFT(Transform):
-    def visit_KronI(self, node):
-        child = node.child
-        if isinstance(child, Product) and node.has(UnscaledFFT):
-            l, r = child.children
-            kl = l._backend.KronI( node._c, l )
-            kr = r._backend.KronI( node._c, r )
+    def visit_Kron(self, node):
+        L, R = node.children
+        if isinstance(L, Eye) and isinstance(R, Product) and node.has(UnscaledFFT):
+            kl = node._backend.Kron( L, R.left_child )
+            kr = node._backend.Kron( L, R.right_child )
             return self.visit(kl * kr)
         else:
             return node

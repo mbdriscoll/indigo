@@ -73,8 +73,9 @@ class Backend(object):
                 contig = old_shape[0] == self._leading_dim
                 assert contig, "Cannot stack non-contiguous columns."
             assert np.prod(new_shape) == self.size
+            new_leading_dim = min(new_shape[0], old_leading_dim) # FIXME: need consistent semantics for reshape
             return self._backend.dndarray( self._backend,
-                new_shape, dtype=self.dtype, ld=old_leading_dim, own=False, data=self._arr)
+                new_shape, dtype=self.dtype, ld=new_leading_dim, own=False, data=self._arr)
 
         @property
         def size(self):

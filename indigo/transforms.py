@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from indigo.operators import (
     CompositeOperator, Product,
-    KronI, BlockDiag,
+    Eye, BlockDiag, Kron,
     VStack, SpMatrix,
     Adjoint, UnscaledFFT,
 )
@@ -134,12 +134,11 @@ class RealizeMatrices(Transform):
     def visit_KronI(self, node):
         """ KronI(c, SpMatrix) => SpMatrix """
         node = self.generic_visit(node)
-        child = node.child
-        if isinstance(child, SpMatrix):
-            name = "{}+".format(child._name)
-            I = spp.identity(node._c, dtype=child.dtype)
-            log.debug('realizing kroni %s', child._name)
-            K = spp.kron(I, child._matrix)
+        L, R = node.children
+        if isinstance(L, SpMatrix) and isinstance(R, SpMatrix):
+            name = "({}(x){})".format(L._name, R._name)
+            log.debug('realizing kron %s x %s', L._name, R._name)
+            K = spp.kron(L._matrix, R._matrix)
             return SpMatrix( node._backend, K, name=name )
         else:
             return node
@@ -175,13 +174,13 @@ class RealizeMatrices(Transform):
 
 
 class DistributeKroniOverProd(Transform):
-    """ KronI(A*B) ==> KronI(A) * KronI(B) """
-    def visit_KronI(self, node):
+    """ Kron(I, A*B) ==> Kron(I, A) * Kron(I, B) """
+    def visit_Kron(self, node):
         node = self.generic_visit(node)
-        if isinstance(node.child, Product):
-            l, r = node.child.children
-            kl = l._backend.KronI( node._c, l )
-            kr = r._backend.KronI( node._c, r )
+        L, R = node.children
+        if isinstance(L, Eye) and isinstance(R, Product):
+            kl = node._backend.Kron( L, R.left_child )
+            kr = node._backend.Kron( L, R.right_child )
             return self.visit(kl * kr)
         else:
             return node
