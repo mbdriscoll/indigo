@@ -141,6 +141,15 @@ def test_array_slice_copy_2d(backend, M,N,xb,xe,yb,ye):
 
     np.testing.assert_equal( exp, act )
 
+@pytest.mark.parametrize("backend", BACKENDS )
+def test_array_bad_slice0(backend):
+    b = backend()
+    arr = indigo.util.rand64c(8,4)
+    d_arr = b.copy_array(arr)
+    slc   = d_arr[2:6,:]
+    with pytest.raises(AssertionError):
+        slc.reshape((8,2))
+
 @pytest.mark.parametrize("backend,batch,x,y,z",
     product( BACKENDS, [1,2,4,8], [23,24,25], [23,24,25], [23,24,25] )
 )

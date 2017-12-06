@@ -162,7 +162,7 @@ class CudaBackend(Backend):
                     CudaBackend.cudaMemcpy.DeviceToDevice)
             else:
                 assert self.contiguous
-                size, kind = arr.nbytes, CudaBackend.cudaMemcpy.DeviceToDevice
+                size, kind = self.nbytes, CudaBackend.cudaMemcpy.DeviceToDevice
                 self._backend.cudaMemcpy(dst, src, size, kind)
 
         def _malloc(self, shape, dtype):
@@ -179,10 +179,6 @@ class CudaBackend(Backend):
 
         def _zero(self):
             self._backend.cudaMemset( self._arr, 0, self.nbytes )
-
-        @property
-        def contiguous(self):
-            return self._leading_dim == self.shape[0]
 
         def __getitem__(self, slc):
             if isinstance(slc, slice):

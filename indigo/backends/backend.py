@@ -73,9 +73,18 @@ class Backend(object):
                 contig = old_shape[0] == self._leading_dim
                 assert contig, "Cannot stack non-contiguous columns."
             assert np.prod(new_shape) == self.size
-            # min for Kron
-            # max for VStack
-            new_leading_dim = min(new_shape[0], old_leading_dim) # FIXME: need consistent semantics for reshape
+            # min for Kron -- make new lda
+            # max for VStack -- preserve original lda
+            #new_leading_dim = min(new_shape[0], old_leading_dim) # FIXME: need consistent semantics for reshape
+            #new_leading_dim = old_leading_dim # works with VStack
+            #new_leading_dim = new_shape[0] # works with Kron
+
+            if new_shape[0] < old_shape[0]:
+                #assert self.contiguous, "Cannot stack vectors of non-contiguous matrix."
+                new_leading_dim = new_shape[0]
+            else:
+                new_leading_dim = old_leading_dim
+
             return self._backend.dndarray( self._backend,
                 new_shape, dtype=self.dtype, ld=new_leading_dim, own=False, data=self._arr)
 
@@ -94,6 +103,13 @@ class Backend(object):
         @property
         def ndim(self):
             return len(self.shape)
+
+        @property
+        def contiguous(self):
+            if self.ndim == 1:
+                return True
+            else:
+                return self._leading_dim == self.shape[0]
 
         def copy_from(self, arr):
             ''' copy from device when both arrays exist '''
