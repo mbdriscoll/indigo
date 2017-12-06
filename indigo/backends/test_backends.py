@@ -111,6 +111,35 @@ def test_array_slice_1d_back(backend, N, s):
     arr_2 = d_arr_2.to_host()
     np.testing.assert_equal( arr_2, arr[s:] )
 
+@pytest.mark.parametrize("backend,M,N,xb,xe,yb,ye",
+    product( BACKENDS, [6,7], [8,9],
+        [0,1,2],[4,5], [0,1,2], [6,7] )
+)
+def test_array_slice_2d(backend, M,N,xb,xe,yb,ye):
+    b = backend()
+    arr = indigo.util.rand64c(M,N)
+    d_arr = b.copy_array(arr)
+    d_arr_2 = d_arr[xb:xe,yb:ye]
+    arr_2 = d_arr_2.to_host()
+    np.testing.assert_equal( arr_2, arr[xb:xe,yb:ye] )
+
+
+@pytest.mark.parametrize("backend,M,N,xb,xe,yb,ye",
+    product( BACKENDS, [6,7], [8,9],
+        [0,1,2],[4,5], [0,1,2], [6,7] )
+)
+def test_array_slice_copy_2d(backend, M,N,xb,xe,yb,ye):
+    b = backend()
+    arr = indigo.util.rand64c(M,N)
+    exp = arr[xb:xe,yb:ye]
+
+    d_arr = b.copy_array(arr)
+    sub = d_arr[xb:xe,yb:ye]
+    sub2 = b.zeros_like(sub)
+    sub2.copy(sub)
+    act = sub2.to_host()
+
+    np.testing.assert_equal( exp, act )
 
 @pytest.mark.parametrize("backend,batch,x,y,z",
     product( BACKENDS, [1,2,4,8], [23,24,25], [23,24,25], [23,24,25] )
