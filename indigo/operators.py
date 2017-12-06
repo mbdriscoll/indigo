@@ -358,7 +358,7 @@ class Eye(MatrixFreeOperator):
 
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         nbytes = (0 if alpha == 0 else x.nbytes) + \
-                 (0 if beta == 0 else y.nbytes)
+                 (0 if  beta == 0 else y.nbytes)
         with profile("axpby", nbytes=nbytes) as p:
             self._backend.axpby(beta, y, alpha, x)
 
