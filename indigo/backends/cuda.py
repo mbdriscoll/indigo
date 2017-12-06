@@ -98,6 +98,12 @@ class CudaBackend(Backend):
         pass
 
     @wrap(cudart)
+    def cudaMemcpy2D( dst:c_ulong, dpitch:c_size_t,
+                      src:c_ulong, spitch:c_size_t,
+                      width:c_size_t, height:c_size_t, kind:c_int) -> cudaError_t:
+        pass
+
+    @wrap(cudart)
     def cudaMemset(
         devPtr : c_ulong,
         size   : c_int,
@@ -119,20 +125,45 @@ class CudaBackend(Backend):
     # -----------------------------------------------------------------------
     class dndarray(Backend.dndarray):
         def _copy_from(self, arr):
+            assert arr.flags['F_CONTIGUOUS']
             src, dst = arr.ctypes.data, self._arr
-            size, kind = arr.nbytes, CudaBackend.cudaMemcpy.HostToDevice
-            self._backend.cudaMemcpy(dst, src, size, kind)
+            if self.ndim == 2:
+                spitch = arr.shape[0] * arr.dtype.itemsize
+                dpitch = self._leading_dim * self.itemsize
+                width, height = self.shape[0] * self.dtype.itemsize, self.shape[1]
+                self._backend.cudaMemcpy2D(dst, dpitch, src, spitch, width, height,
+                    CudaBackend.cudaMemcpy.HostToDevice)
+            else:
+                assert self.contiguous
+                size, kind = arr.nbytes, CudaBackend.cudaMemcpy.HostToDevice
+                self._backend.cudaMemcpy(dst, src, size, kind)
 
         def _copy_to(self, arr):
             assert arr.flags['F_CONTIGUOUS']
             src, dst = self._arr, arr.ctypes.data
-            size, kind = arr.nbytes, CudaBackend.cudaMemcpy.DeviceToHost
-            self._backend.cudaMemcpy(dst, src, size, kind)
+            if self.ndim == 2:
+                spitch = self._leading_dim * self.itemsize
+                dpitch = arr.shape[0] * arr.dtype.itemsize
+                width, height = self.shape[0] * self.dtype.itemsize, self.shape[1]
+                self._backend.cudaMemcpy2D(dst, dpitch, src, spitch, width, height,
+                    CudaBackend.cudaMemcpy.DeviceToHost)
+            else:
+                assert self.contiguous
+                size, kind = arr.nbytes, CudaBackend.cudaMemcpy.DeviceToHost
+                self._backend.cudaMemcpy(dst, src, size, kind)
 
         def _copy(self, d_arr):
             src, dst = d_arr._arr, self._arr
-            size, kind = self.nbytes, CudaBackend.cudaMemcpy.DeviceToDevice
-            self._backend.cudaMemcpy(dst, src, size, kind)
+            if self.ndim == 2:
+                spitch = d_arr._leading_dim * d_arr.itemsize
+                dpitch =  self._leading_dim *  self.itemsize
+                width, height = self.shape[0] * self.dtype.itemsize, self.shape[1]
+                self._backend.cudaMemcpy2D(dst, dpitch, src, spitch, width, height,
+                    CudaBackend.cudaMemcpy.DeviceToDevice)
+            else:
+                assert self.contiguous
+                size, kind = self.nbytes, CudaBackend.cudaMemcpy.DeviceToDevice
+                self._backend.cudaMemcpy(dst, src, size, kind)
 
         def _malloc(self, shape, dtype):
             align = 256
@@ -166,7 +197,7 @@ class CudaBackend(Backend):
             idx = np.ravel_multi_index(start, self.shape, order='F')
             ptr = self._arr.value + idx * np.dtype(self.dtype).itemsize
             ptr = c_ulong(ptr)
-            ld = self._leading_dims
+            ld = self._leading_dim
             return self._backend.dndarray(self._backend, tuple(shape),
                 self.dtype, ld=ld, own=False, data=ptr)
 
@@ -310,6 +341,45 @@ class CudaBackend(Backend):
         m      : c_int,
         n      : c_int,
         k      : c_int,
+        alpha  : ndpointer(dtype=np.complex64, ndim=0),
+        M      : dndarray,
+        lda    : c_int,
+        x      : dndarray,
+        ldb    : c_int,
+        beta   : ndpointer(dtype=np.complex64, ndim=0),
+        y      : dndarray,
+        ldc    : c_int,
+    ) -> cublasStatus_t:
+        pass
+
+    def csymm(self, y, M, x, alpha, beta, left=True):
+        assert isinstance(x, self.dndarray)
+        alpha = np.array(alpha, dtype=np.complex64)
+        beta  = np.array( beta, dtype=np.complex64)
+        (m, n), k = y.shape, x.shape[0]
+        lda = M._leading_dim
+        ldb = x._leading_dim
+        ldc = y._leading_dim
+        uplo = CudaBackend.cublasFillMode_t.UPPER
+        side = getattr(CudaBackend.cublasSideMode_t, 'LEFT' if left else 'RIGHT')
+        self.cublasCsymm_v2( self._cublas_handle, side, uplo,
+            m, n, alpha, M, lda, x, ldb, beta, y, ldc )
+
+    class cublasSideMode_t(c_uint):
+        LEFT  = 0
+        RIGHT = 1
+
+    class cublasFillMode_t(c_uint):
+        LOWER = 0
+        UPPER = 1
+
+    @wrap(cublas)
+    def cublasCsymm_v2(
+        handle : cublasHandle_t,
+        size   : cublasSideMode_t,
+        uplo   : cublasFillMode_t,
+        m      : c_int,
+        n      : c_int,
         alpha  : ndpointer(dtype=np.complex64, ndim=0),
         M      : dndarray,
         lda    : c_int,
@@ -512,8 +582,8 @@ class CudaBackend(Backend):
     def ccsrmm(self, y, A_shape, A_indx, A_ptr, A_vals, x, alpha, beta, adjoint=False, exwrite=False):
         m, k = A_shape
         n = x.shape[1]
-        ldx = x._leading_dims[0]
-        ldy = y._leading_dims[0]
+        ldx = x._leading_dim
+        ldy = y._leading_dim
         if adjoint:
             trans = self.CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
         else:

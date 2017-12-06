@@ -66,10 +66,9 @@ class MklBackend(Backend):
             self._arr[:] = 0
 
         def __getitem__(self, slc):
-            ld = self._leading_dims
-            d = self._arr.reshape(self.shape, order='F')[slc]
+            d = self._arr[slc]
             return self._backend.dndarray( self._backend, d.shape, d.dtype,
-                ld=ld, own=False, data=d )
+                ld=self._leading_dim, own=False, data=d )
 
         def to_host(self):
             return self._arr
@@ -175,6 +174,47 @@ class MklBackend(Backend):
         ldc   : c_int,
     ) -> c_void_p:
         pass
+
+    class CBlasSide(c_uint):
+        Left  = 141
+        Right = 142
+
+    class CBlasUplo(c_uint):
+        Upper = 121
+        Lower = 122
+
+    @wrap
+    def cblas_csymm(
+        layout: CBlasLayout,
+        side  : CBlasSide,
+        uplo  : CBlasUplo,
+        m     : c_int,
+        n     : c_int,
+        alpha : ndpointer(dtype=np.complex64, ndim=0),
+        a     : dndarray,
+        lda   : c_int,
+        b     : dndarray,
+        ldb   : c_int,
+        beta  : ndpointer(dtype=np.complex64, ndim=0),
+        c     : dndarray,
+        ldc   : c_int,
+    ) -> c_void_p:
+        pass
+
+    def csymm(self, y, M, x, alpha, beta, left=True):
+        layout = MklBackend.CBlasLayout.ColMajor
+        side = MklBackend.CBlasSide.Left if left else MklBackend.CBlasSide.Right
+        uplo = MklBackend.CBlasUplo.Upper
+        (m, n), k = y.shape, x.shape[0]
+        alpha = np.array(alpha, dtype=np.complex64)
+        beta  = np.array( beta, dtype=np.complex64)
+        lda = M._leading_dim
+        ldb = x._leading_dim
+        ldc = y._leading_dim
+        self.cblas_csymm(
+            layout, side, uplo, m, n, alpha, M, lda,
+            x, ldb, beta, y, ldc
+        )
 
     @wrap
     def cblas_caxpby(
@@ -371,8 +411,9 @@ class MklBackend(Backend):
             transA[0] = b'C'
         else:
             transA[0] = b'N' 
-        ldx = np.array(x._leading_dims[0], dtype=np.int32)
-        ldy = np.array(y._leading_dims[0], dtype=np.int32)
+
+        ldx = np.array(x._leading_dim, dtype=np.int32)
+        ldy = np.array(y._leading_dim, dtype=np.int32)
 
         A_ptrb = A_ptr[:-1]
         A_ptre = A_ptr[1:]
@@ -437,8 +478,8 @@ class MklBackend(Backend):
 
     def cdiamm(self, y, shape, offsets, data, x, alpha=1.0, beta=0.0, adjoint=False):
         transA = create_string_buffer(b'N' if adjoint else b'C', size=1)
-        ldx = np.array(x._leading_dims[0], dtype=np.int32)
-        ldy = np.array(y._leading_dims[0], dtype=np.int32)
+        ldx = np.array(x._leading_dim, dtype=np.int32)
+        ldy = np.array(y._leading_dim, dtype=np.int32)
 
         m     = np.array(shape[0],   dtype=np.int32)
         n     = np.array(x.shape[1], dtype=np.int32)

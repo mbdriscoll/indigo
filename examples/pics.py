@@ -22,6 +22,7 @@ parser.add_argument('-i', type=int, default=20, help='number of iterations')
 parser.add_argument('--backend', type=str, default='numpy', choices=['mkl', 'numpy', 'cuda', 'customcpu', 'customgpu'])
 parser.add_argument('--debug', type=int, default=logging.INFO, help='logging level')
 parser.add_argument('--crop', help='crop data before recon: --crop "COIL:2,TIME:4')
+parser.add_argument('--lamda', type=float, default=0, help='tikhonov reg parameter')
 parser.add_argument('-O', '--recipe', type=int, default=3, choices=range(5), help='optimization level')
 parser.add_argument('data', nargs='?', default="scan.h5", help='kspace data in an HDF file')
 args = parser.parse_args()
@@ -37,9 +38,9 @@ log.info("using backend: %s", type(B).__name__)
 
 # open input file
 hdf = h5py.File(args.data, 'r+')
-data = hdf['data']
-maps = hdf['maps']
-traj = hdf['traj']
+data = hdf['data'][:]
+maps = hdf['maps'][:]
+traj = hdf['traj'][:]
 
 # crop input data
 crops = [1e6] * dim.NDIM
@@ -83,19 +84,22 @@ slc[dim.READ] = slice(None)
 slc[dim.PHS1] = slice(None)
 slc[dim.PHS2] = slice(None)
 
+osf = (640/480, 640/480, 640/480) # uniform
 #osf = (640/480, 270/208, 432/308) # cpu
 #osf = (640/480, 288/208, 400/308) # knl
-osf = (600/480, 270/208, 392/308) # gpu
+#osf = (600/480, 270/208, 392/308) # gpu
 
 F1= B.NUFFT(ksp_nc_dims[:3], ksp_c_dims[:3], traj[slc], oversamp=osf, dtype=ksp.dtype)
 F = B.KronI(C, F1)
 S = B.VStack([B.Diag(mps[:,:,:,c:c+1]) for c in range(C)], name='maps')
 A = F * S; A._name = 'SENSE1'
 
+import scipy.sparse as spp
 
 from indigo.transforms import Transform, Visitor
-from indigo.operators import Product, UnscaledFFT, SpMatrix, VStack, KronI
-import scipy.sparse as spp
+from indigo.operators import (
+    Product, UnscaledFFT, SpMatrix, VStack, Eye, Kron
+)
 
 class MriGoodAdjoints(Transform):
     def visit_SpMatrix(self, node):
@@ -115,7 +119,7 @@ class MriRealize(Transform):
 
     def visit_Product(self, node):
         l, r = node.children
-        if isinstance(r, VStack) and isinstance(l, KronI):
+        if isinstance(r, VStack) and isinstance(l, Kron):
             return node.realize()
 
         node = self.generic_visit(node)
@@ -126,24 +130,23 @@ class MriRealize(Transform):
             return node
 
 class DistKroniOverFFT(Transform):
-    def visit_KronI(self, node):
-        child = node.child
-        if isinstance(child, Product) and node.has(UnscaledFFT):
-            l, r = child.children
-            kl = l._backend.KronI( node._c, l )
-            kr = r._backend.KronI( node._c, r )
+    def visit_Kron(self, node):
+        L, R = node.children
+        if isinstance(L, Eye) and isinstance(R, Product) and node.has(UnscaledFFT):
+            kl = node._backend.Kron( L, R.left )
+            kr = node._backend.Kron( L, R.right )
             return self.visit(kl * kr)
         else:
             return node
 
 class AssocSpMatrices(Transform):
     def visit_Product(self, node):
-        l = self.visit(node.left_child)
-        r = self.visit(node.right_child)
+        l = self.visit(node.left)
+        r = self.visit(node.right)
 
         try:
-            rl = r.left_child
-            rr = r.right_child
+            rl = r.left
+            rr = r.right
             if isinstance(l, SpMatrix) and not isinstance(rl, UnscaledFFT):
                 return (l*rl) * rr
         except (AttributeError, AssertionError):
@@ -153,22 +156,22 @@ class AssocSpMatrices(Transform):
     
 class MakeRightLeaning(Transform):
     def visit_Product(self, node):
-        l = self.visit(node.left_child)
-        r = self.visit(node.right_child)
+        l = self.visit(node.left)
+        r = self.visit(node.right)
         if isinstance(l, Product):
-            ll = l.left_child
-            lr = l.right_child
+            ll = l.left
+            lr = l.right
             return self.visit(ll*(lr*r))
         else:
             return l*r
 
 class MakeLeftLeaning(Transform):
     def visit_Product(self, node):
-        l = self.visit(node.left_child)
-        r = self.visit(node.right_child)
+        l = self.visit(node.left)
+        r = self.visit(node.right)
         if isinstance(r, Product):
-            rl = r.left_child
-            rr = r.right_child
+            rl = r.left
+            rr = r.right
             return self.visit((l*rl)*rr)
         else:
             return l*r
@@ -189,7 +192,7 @@ if args.recipe >= 4:
 
 A = A.optimize(recipe)
 
-AHA = A.H * A
+AHA = (A.H * A) + args.lamda * B.Eye(A.shape[1])
 AHA._name = 'SENSE'
 log.info("tree:\n%s", AHA.dump())
 
@@ -215,10 +218,15 @@ hdf.close()
 try:
     from scipy.misc import imsave
     slc = [slice(None)] * img.ndim
-    slc[dim.PHS2] = img.shape[dim.PHS2] // 2
     for t in range(T):
         slc[dim.TIME] = t
-        imsave("img_t%02d.jpg" % t, abs(img[slc].T.squeeze()))
+        im = img[slc].squeeze()
+        imf = im.flatten()
+        print("%f" % (sum(abs(imf))/len(imf)))
+        x2, y2, z2 = (np.array(im.shape) / 2).astype(int)
+        imsave("img_t%02d_x.jpg" % t, abs(im[x2,:,:]))
+        imsave("img_t%02d_y.jpg" % t, abs(im[:,y2,:]))
+        imsave("img_t%02d_z.jpg" % t, abs(im[:,:,z2]))
 except ImportError:
     log.warn("install PIL or Pillow to generate preview images.")
 

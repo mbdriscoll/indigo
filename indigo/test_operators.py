@@ -84,7 +84,7 @@ def test_Product(backend, L, M, N, K, density, alpha, beta):
 
 
 @pytest.mark.parametrize("backend,stack,M,N,K,density,alpha,beta",
-    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,1,0.5] ))
+    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,4,8,9,17], [0.1,0.5,1], [0,.5,1], [0,1,0.5] ))
 def test_VStack(backend, stack, M, N, K, density, alpha, beta):
     b = backend()
     mats_h = [indigo.util.randM(M,N,density) for i in range(stack)]
@@ -191,15 +191,15 @@ def test_Eye(backend, M, K):
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
 
-@pytest.mark.parametrize("backend,stack,M,N,K,density,alpha,beta",
-    product( BACKENDS, [1,2,3], [5,6], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
-def test_KronI(backend, stack, M, N, K, density, alpha, beta):
+@pytest.mark.parametrize("backend,M,N,K,density,alpha,beta",
+    product( BACKENDS, [5,6], [7,8], [1,8,9,17], [0.9,0.5,1], [0,.5,1], [0,.5,1] ))
+def test_KronI(backend, M, N, K, density, alpha, beta):
     b = backend()
     mat_h = indigo.util.randM(M,N,density)
-    A_h = spp.kron( spp.eye(stack), mat_h )
+    A_h = spp.kron( spp.eye(K), mat_h )
 
     mat_d = b.SpMatrix(mat_h)
-    A = b.KronI(stack, mat_d)
+    A = b.KronI(K, mat_d)
 
     # forward
     x = b.rand_array((A.shape[1],K))
@@ -211,13 +211,13 @@ def test_KronI(backend, stack, M, N, K, density, alpha, beta):
     # adjoint
     x = b.rand_array((A.shape[0],K))
     y = b.rand_array((A.shape[1],K))
-    y_exp = beta * y.to_host() + alpha * A_h.H @ x.to_host()
+    y_exp = beta * y.to_host() + alpha * np.conj(A_h.T) @ x.to_host()
     A.H.eval(y, x, alpha=alpha, beta=beta)
     npt.assert_allclose(y.to_host(), y_exp, rtol=1e-5)
 
     # shape
-    assert A.shape == (M*stack,N*stack)
-    assert A.H.shape == (N*stack,M*stack)
+    assert A.shape == (M*K,N*K)
+    assert A.H.shape == (N*K,M*K)
 
     # dtype
     assert A.dtype == np.dtype('complex64')
@@ -380,7 +380,7 @@ def test_zpad(backend, batch, x, y, z, px, py, pz):
 
     b = backend()
     A = b.Zpad( M[:3], N[:3], dtype=v.dtype )
-    
+
     # check adjoint
     u_d = b.copy_array(u.reshape((-1,batch), order='F'))
     v_d = b.copy_array(v.reshape((-1,batch), order='F'))
@@ -557,7 +557,7 @@ def test_One(backend, M, N, K, alpha, beta, forward):
     if not hasattr(B, 'onemm'):
         pytest.skip("backend doesn't implement onemm")
     O = B.One((M,K), dtype=np.complex64)
- 
+
     if forward:
         u, v = x, y
     else:
@@ -570,3 +570,72 @@ def test_One(backend, M, N, K, alpha, beta, forward):
     O.eval(v_d, u_d, alpha=alpha, beta=beta, forward=forward)
     act = v_d.to_host()
     np.testing.assert_allclose(act, exp, rtol=1e-5)
+
+
+@pytest.mark.parametrize("backend,sym,m,k",
+    product(BACKENDS, [True,False], [2,4,5,6], [1,2,3])
+)
+def test_DenseMatrix_symmetric(backend, sym, m, k):
+    b = backend()
+    data = indigo.util.rand64c(m,m)
+    if sym:
+        data = np.asfortranarray(data + data.T) # make symmetric
+        data.imag = 0 # make imaginary
+    M = b.DenseMatrix(data)
+    assert (M._real_symmetric if sym else not M._real_symmetric)
+    x = indigo.util.rand64c(m,k)
+    y_exp = np.dot(data, x)
+    y_act = M * x
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
+
+
+@pytest.mark.parametrize("backend,L,Q,alpha,beta,eyeL,eyeR",
+    product( BACKENDS, [3,4], [5,6],
+        [0,.5,1], [0,.5,1], [True, False], [True, False] ))
+def test_Kron_general(backend, L, Q, alpha, beta, eyeL, eyeR):
+    b = backend()
+
+    if eyeL:
+        A = np.eye(L, dtype=np.complex64)
+        A_d = b.Eye(L)
+        if not eyeR: A_d._eval = lambda unreachable: ()
+    else:
+        A = indigo.util.rand64c(L,L)
+        A_d = b.DenseMatrix(A)
+
+    if eyeR:
+        B = np.eye(Q, dtype=np.complex64)
+        B_d = b.Eye(Q)
+        if not eyeL: B_d._eval = lambda unreachable: ()
+    else:
+        B = indigo.util.rand64c(Q,Q)
+        B = B + B.T
+        B.imag = 0
+        B_d = b.DenseMatrix(B)
+
+    K = b.Kron( B_d, A_d )
+    vec = lambda arr: arr.reshape((-1,1), order='F')
+
+    # check
+    X = indigo.util.rand64c(L,Q)
+    Y = indigo.util.rand64c(L,Q)
+    y_exp  = alpha * np.kron(B.T, A) @ vec(X) + beta * vec(Y)
+    y_exp2 = alpha * vec(A @ X @ B) + beta * vec(Y)
+    npt.assert_allclose(y_exp2, y_exp, rtol=1e-5)
+
+    # forward
+    x_d = b.copy_array(X)
+    y_d = b.copy_array(Y)
+    K.eval(y_d, x_d, alpha=alpha, beta=beta)
+    y_act = y_d.to_host()
+    npt.assert_allclose(vec(y_act), y_exp, rtol=1e-5)
+
+    # adjoint
+    X = indigo.util.rand64c(Q,L)
+    Y = indigo.util.rand64c(Q,L)
+    y_exp = alpha * np.conj(np.kron(B.T, A).T) @ vec(X) + beta * vec(Y)
+    x_d = b.copy_array(X)
+    y_d = b.copy_array(Y)
+    K.eval(y_d, x_d, alpha=alpha, beta=beta, forward=False)
+    y_act = y_d.to_host()
+    npt.assert_allclose(vec(y_act), y_exp, rtol=1e-5)

@@ -1,3 +1,4 @@
+import os
 import logging
 
 log = logging.getLogger(__name__)
@@ -5,33 +6,36 @@ log = logging.getLogger(__name__)
 def available_backends():
     backends = []
 
+    allow = os.environ.get("INDIGO_TEST_BACKENDS",
+        "np,mkl,cuda,customcpu,customgpu")
+
     try:
         from indigo.backends.np import NumpyBackend
-        backends.append( NumpyBackend )
+        if 'np' in allow: backends.append( NumpyBackend )
     except Exception as e:
         log.warn("couldn't find NUMPY backend")
 
     try:
         from indigo.backends.mkl import MklBackend
-        backends.append( MklBackend )
+        if 'mkl' in allow: backends.append( MklBackend )
     except Exception as e:
         log.warn("couldn't find MKL backend")
 
     try:
         from indigo.backends.cuda import CudaBackend
-        backends.append( CudaBackend )
+        if 'cuda' in allow: backends.append( CudaBackend )
     except Exception as e:
         log.warn("couldn't find CUDA backend")
 
     try:
         from indigo.backends.customcpu import CustomCpuBackend
-        backends.append( CustomCpuBackend )
+        if 'customcpu' in allow: backends.append( CustomCpuBackend )
     except Exception as e:
         log.warn("couldn't find CustomCpu backend")
 
     try:
         from indigo.backends.customgpu import CustomGpuBackend
-        backends.append( CustomGpuBackend )
+        if 'customgpu' in allow: backends.append( CustomGpuBackend )
     except Exception as e:
         log.warn("couldn't find CustomGpu backend")
 

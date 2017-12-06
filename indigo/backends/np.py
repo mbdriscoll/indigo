@@ -37,7 +37,7 @@ class NumpyBackend(Backend):
 
         def __getitem__(self, slc):
             d = self._arr.reshape(self.shape, order='F')[slc]
-            ld = self._leading_dims
+            ld = self._leading_dim
             return self._backend.dndarray( self._backend, d.shape, d.dtype,
                 ld=ld, own=False, data=d)
 
@@ -54,7 +54,8 @@ class NumpyBackend(Backend):
         """ y = beta*y + alpha*x """
         assert isinstance(x, self.dndarray)
         assert isinstance(y, self.dndarray)
-        y._arr[:] = beta * y._arr + alpha * x._arr
+        x = x._arr.reshape(y._arr.shape, order='F')
+        y._arr[:] = beta * y._arr + alpha * x
 
     def dot(self, x, y):
         """ returns x^T * y """
@@ -72,13 +73,21 @@ class NumpyBackend(Backend):
         assert isinstance(x, self.dndarray)
         x._arr *= alpha
 
-    def cgemm(self, y, M, x, alpha, beta, forward):
-        x, y, M = x._arr, y._arr, M._arr
-        if forward:
+    def cgemm(self, y, M, x, alpha=1, beta=0, forward=True, left=True):
+        y, M, x = y._arr, M._arr, x._arr
+        if not forward:
+            M = np.conj(M.T)
+        if left:
+            x = x.reshape((M.shape[1],-1), order='F')
+            y = y.reshape((M.shape[0],-1), order='F')
             y[:] = alpha * (M @ x) + beta * y
         else:
-            MH = np.conj(M.T)
-            y[:] = alpha * (MH @ x) + beta * y
+            x = x.reshape((-1,M.shape[0]), order='F')
+            y = y.reshape((-1,M.shape[1]), order='F')
+            y[:] = alpha * (x @ M) + beta * y
+
+    def csymm(self, y, M, x, alpha, beta, left=True):
+        return self.cgemm(y, M, x, alpha, beta, forward=True, left=left)
 
     # -----------------------------------------------------------------------
     # OneMM Routines
@@ -86,6 +95,7 @@ class NumpyBackend(Backend):
     def onemm(self, y, x, alpha, beta):
         y._arr[:] = beta * y._arr + alpha * \
             np.broadcast_to(x._arr.sum(axis=0, keepdims=True), y.shape)
+
     # -----------------------------------------------------------------------
     # FFT Routines
     # -----------------------------------------------------------------------

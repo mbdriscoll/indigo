@@ -111,6 +111,44 @@ def test_array_slice_1d_back(backend, N, s):
     arr_2 = d_arr_2.to_host()
     np.testing.assert_equal( arr_2, arr[s:] )
 
+@pytest.mark.parametrize("backend,M,N,xb,xe,yb,ye",
+    product( BACKENDS, [6,7], [8,9],
+        [0,1,2],[4,5], [0,1,2], [6,7] )
+)
+def test_array_slice_2d(backend, M,N,xb,xe,yb,ye):
+    b = backend()
+    arr = indigo.util.rand64c(M,N)
+    d_arr = b.copy_array(arr)
+    d_arr_2 = d_arr[xb:xe,yb:ye]
+    arr_2 = d_arr_2.to_host()
+    np.testing.assert_equal( arr_2, arr[xb:xe,yb:ye] )
+
+
+@pytest.mark.parametrize("backend,M,N,xb,xe,yb,ye",
+    product( BACKENDS, [6,7], [8,9],
+        [0,1,2],[4,5], [0,1,2], [6,7] )
+)
+def test_array_slice_copy_2d(backend, M,N,xb,xe,yb,ye):
+    b = backend()
+    arr = indigo.util.rand64c(M,N)
+    exp = arr[xb:xe,yb:ye]
+
+    d_arr = b.copy_array(arr)
+    sub = d_arr[xb:xe,yb:ye]
+    sub2 = b.zeros_like(sub)
+    sub2.copy(sub)
+    act = sub2.to_host()
+
+    np.testing.assert_equal( exp, act )
+
+@pytest.mark.parametrize("backend", BACKENDS )
+def test_array_bad_slice0(backend):
+    b = backend()
+    arr = indigo.util.rand64c(8,4)
+    d_arr = b.copy_array(arr)
+    slc   = d_arr[2:6,:]
+    with pytest.raises(AssertionError):
+        slc.reshape((8,2))
 
 @pytest.mark.parametrize("backend,batch,x,y,z",
     product( BACKENDS, [1,2,4,8], [23,24,25], [23,24,25], [23,24,25] )
@@ -172,22 +210,21 @@ def test_csr_matrix(backend, M, N, K, density):
     np.testing.assert_allclose(y_exp, y_act, atol=1e-5)
 
 
-@pytest.mark.parametrize("backend,M,N,alpha,beta,stack",
-    product( BACKENDS, [23,45], [1,8,9,17], [0.0,0.5,1.0,1.5], [0.0,0.5,1.0,1.5], [1,2,5] )
+@pytest.mark.parametrize("backend,M,N,K,alpha,beta,stack",
+    product( BACKENDS, [23,45], [1,8,9,17], [18,19], [0.0,0.5,1.0,1.5], [0.0,0.5,1.0,1.5], [1,2,5] )
 )
-def test_exw_csr_matrix(backend, M, N, alpha, beta, stack):
+def test_exw_csr_matrix(backend, M, N, K, alpha, beta, stack):
     b = backend()
-    c = np.dtype('complex64')
-    d0 = spp.diags(np.arange(M))
-    d1 = spp.diags(np.arange(M)+100)
-    A = spp.vstack([spp.diags(np.arange(M)+s*100) for s in range(stack)]).astype(c)
+    rowCounts = np.random.randint(0,2,K)
+    rowPtrs = np.concatenate( [np.array([0]), np.cumsum(rowCounts)] )
+    colInds = np.random.randint(0,M,sum(rowCounts))
+    values = indigo.util.rand64c(*colInds.shape)
+    A = spp.csr_matrix( (values, colInds, rowPtrs), shape=(K,M) ).T
     A_d = b.csr_matrix(b, A)
 
     # forward
-    x = (np.random.rand(M,N) + 1j * np.random.rand(M,N))
-    y = (np.random.rand(stack*M,N) + 1j * np.random.rand(stack*M,N))
-    x = np.require(x, dtype=c, requirements='F')
-    y = np.require(y, dtype=c, requirements='F')
+    x = indigo.util.rand64c(K,N)
+    y = indigo.util.rand64c(M,N)
     x_d = b.copy_array(x)
     y_d = b.copy_array(y)
     A_d.forward(y_d, x_d, alpha=alpha, beta=beta)
@@ -196,8 +233,8 @@ def test_exw_csr_matrix(backend, M, N, alpha, beta, stack):
     np.testing.assert_allclose(y_exp, y_act, atol=1e-3)
 
     # adjoint
-    x = (np.random.rand(stack*M,N) + 1j * np.random.rand(stack*M,N)).astype(c)
-    y = (np.random.rand(M,N) + 1j * np.random.rand(M,N)).astype(c)
+    x = indigo.util.rand64c(M,N)
+    y = indigo.util.rand64c(K,N)
     x_d = b.copy_array(x)
     y_d = b.copy_array(y)
     A_d.adjoint(y_d, x_d, alpha=alpha, beta=beta)
@@ -452,3 +489,35 @@ def test_only_complex64(backend, dtype):
     with pytest.raises(AssertionError):
         A = b.SpMatrix(A0).eval(y,x)
 
+
+@pytest.mark.parametrize("backend,m,k,alpha,beta,forward,left",
+    product(BACKENDS, [2,4,5,6], [1,2,3],[0.0,0.5,1.0,1.5],[0.0,0.5,1.0,1.5],[True,False],[True,False])
+)
+def test_csymm(backend, m, k, alpha, beta, forward, left):
+    b = backend()
+
+    data = indigo.util.rand64c(m,m)
+    data = np.asfortranarray(data + data.T) # make symmetric
+    data.imag = 0 # make real
+    M = data
+
+    if left:
+        x = indigo.util.rand64c(m,k)
+        y = indigo.util.rand64c(m,k)
+    else:
+        x = indigo.util.rand64c(k,m)
+        y = indigo.util.rand64c(k,m)
+
+    if left:
+        y_exp = alpha * (M @ x) + beta * y
+    else:
+        y_exp = alpha * (x @ M) + beta * y
+
+    M_d = b.copy_array(M)
+    x_d = b.copy_array(x)
+    y_d = b.copy_array(y)
+
+    b.csymm(y_d, M_d, x_d, alpha, beta, left)
+
+    y_act = y_d.to_host()
+    np.testing.assert_allclose(y_exp, y_act, atol=1e-5)

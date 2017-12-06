@@ -17,22 +17,23 @@ class Operator(object):
         self._batch = batch
         self._name = name
 
-    def eval(self, y, x, alpha=1, beta=0, forward=True):
-        """ y = A * x """
-        if x.ndim == 1: x = x.reshape( (x.shape[0], 1) )
-        if y.ndim == 1: y = y.reshape( (y.shape[0], 1) )
+    def eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        """
+        if left:
+            y = A * x
+        else:
+            y = x * A
+        """
         M, N = self.shape if forward else tuple(reversed(self.shape))
-        if x.shape[0] != N or \
-           y.shape[0] != M or \
-           x.shape[1] != y.shape[1]:
-            raise ValueError("Dimension mismatch: attemping {} = {} * {} ({}, {})".format(
-                y.shape, (M,N), x.shape, forward, type(self)))
-
-        batch_size = self._batch or x.shape[1]
-        for b in range(0, x.shape[1], batch_size):
-          x_slc = x[:,b:b+batch_size]
-          y_slc = y[:,b:b+batch_size]
-          self._eval(y_slc, x_slc, alpha=alpha, beta=beta, forward=forward)
+        if left: # left-multiply
+            x = x.reshape( (N,-1) )
+            y = y.reshape( (M,-1) )
+            assert x.shape[1] == y.shape[1], "Dimension mismatch"
+        else: # right-multiply
+            x = x.reshape( (-1,M) )
+            y = y.reshape( (-1,N) )
+            assert x.shape[0] == y.shape[0], "Dimension mismatch"
+        self._eval(y, x, alpha=alpha, beta=beta, forward=forward, left=left)
 
     @property
     def shape(self):
@@ -131,16 +132,6 @@ class CompositeOperator(Operator):
     def children(self):
         return self._children
 
-    @property
-    def left_child(self):
-        assert len(self._children) == 2
-        return self._children[0]
-
-    @property
-    def right_child(self):
-        assert len(self._children) == 2
-        return self._children[1]
-
     def _adopt(self, children):
         self._children = children
 
@@ -152,6 +143,16 @@ class CompositeOperator(Operator):
     def realize(self):
         from indigo.transforms import RealizeMatrices
         return RealizeMatrices().visit(self)
+
+
+class BinaryOperator(CompositeOperator):
+    @property
+    def left(self):
+        return self._children[0]
+
+    @property
+    def right(self):
+        return self._children[1]
 
 
 class MatrixFreeOperator(CompositeOperator):
@@ -185,8 +186,8 @@ class Adjoint(CompositeOperator):
     def H(self):
         return self.child
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
-        self.child.eval( y, x, alpha, beta, forward=not forward)
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        self.child.eval( y, x, alpha, beta, forward=not forward, left=left)
 
 
 class SpMatrix(Operator):
@@ -238,7 +239,9 @@ class SpMatrix(Operator):
                     log.debug("allowing exwrite for %s" % self._name)
         return self._matrix_d
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         M = self._get_or_create_device_matrix()
         if forward:
             read_frac, write_frac = M._col_frac, M._row_frac
@@ -262,16 +265,15 @@ class SpMatrix(Operator):
 
 class DenseMatrix(Operator):
     def __init__(self, backend, M, **kwargs):
-        """
-        Create a new Sparse Matrix Operator from a concrete sparse matrix.
-        """
         super().__init__(backend, **kwargs)
         assert isinstance(M, np.ndarray)
+        M = np.require(M, requirements='F')
         assert M.dtype == np.dtype('complex64')
-        assert M.flags['F_CONTIGUOUS']
         assert M.ndim == 2
         self._matrix = M
         self._matrix_d = None
+        self._real_symmetric = M.shape[0] == M.shape[1] and \
+            np.allclose(M.imag, 0) and np.allclose(M, M.T)
 
     @property
     def dtype(self):
@@ -286,12 +288,18 @@ class DenseMatrix(Operator):
             self._matrix_d = self._backend.copy_array( self._matrix )
         return self._matrix_d
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left and not self._real_symmetric:
+            raise NotImplementedError("Right-multiplication not implemented for non-real-symmetric {}.".format(self.__class__.__name__))
         M_d = self._get_or_create_device_matrix()
         (m, n), k = M_d.shape, x.shape[1]
         nflops = m * n * k * 5
-        with profile("cgemm", nflops=nflops):
-            self._backend.cgemm(y, M_d, x, alpha, beta, forward=forward)
+        if self._real_symmetric:
+            with profile("csymm", nflops=nflops/2):
+                self._backend.csymm(y, M_d, x, alpha=alpha, beta=beta, left=left)
+        else:
+            with profile("cgemm", nflops=nflops):
+                self._backend.cgemm(y, M_d, x, alpha=alpha, beta=beta, forward=forward)
 
 
 class UnscaledFFT(MatrixFreeOperator):
@@ -300,7 +308,9 @@ class UnscaledFFT(MatrixFreeOperator):
         n = np.prod(self._ft_shape)
         super().__init__(backend, shape=(n,n), **kwargs)
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         assert alpha == 1 and beta == 0
         X = x.reshape( self._ft_shape + (x.shape[1],) )
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
@@ -336,28 +346,47 @@ class Eye(MatrixFreeOperator):
     def __init__(self, backend, n, **kwargs):
         super().__init__(backend, shape=(n,n), **kwargs)
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         nbytes = (0 if alpha == 0 else x.nbytes) + \
-                 (0 if beta == 0 else y.nbytes)
+                 (0 if  beta == 0 else y.nbytes)
         with profile("axpby", nbytes=nbytes) as p:
             self._backend.axpby(beta, y, alpha, x)
 
 
-class KronI(CompositeOperator):
-    def __init__(self, backend, c, *args, **kwargs):
-        super().__init__(backend, *args, **kwargs)
-        self._c = c
-
+class Kron(BinaryOperator):
+    """ op := A \kron B """
     @property
     def shape(self):
-        h, w = self.child.shape
-        return (self._c * h, self._c * w)
+        h = int(np.prod([c.shape[0] for c in self._children]))
+        w = int(np.prod([c.shape[1] for c in self._children]))
+        return (h,w)
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
-        cb = self._c * x.shape[1]
-        X = x.reshape( (x.size // cb, cb) )
-        Y = y.reshape( (y.size // cb, cb) )
-        self.child.eval(Y, X, alpha=alpha, beta=beta, forward=forward)
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
+        L, R = self.children
+
+        # transpose-corrected shapes
+        R_shape = R.shape if forward else R.shape[::-1]
+        L_shape = L.shape if forward else L.shape[::-1]
+
+        if isinstance(L, Eye):
+            R.eval(y, x, alpha=alpha, beta=beta, forward=forward, left=left)
+        elif isinstance(R, Eye):
+            L.eval(y, x, alpha=alpha, beta=beta, forward=forward, left=not left)
+        else:
+            x = x.reshape( (-1, L_shape[0]) )
+            y = y.reshape( (-1, L_shape[1]) )
+            tmp_shape = (x.shape[0], L_shape[1])
+            with self._backend.scratch(shape=tmp_shape) as tmp:
+                if forward:
+                    L.eval(tmp, x, alpha=alpha, beta=0,    forward=not forward, left=not left)
+                    tmp = tmp.reshape( (R_shape[1], -1) )
+                    R.eval(y, tmp, alpha=1,     beta=beta, forward=forward,     left=left)
+                else:
+                    L.eval(tmp, x, alpha=alpha, beta=0,    forward=forward,     left=not left)
+                    tmp = tmp.reshape( (R_shape[1], -1) )
+                    R.eval(y, tmp, alpha=1,     beta=beta, forward=forward, left=left)
 
 
 class BlockDiag(CompositeOperator):
@@ -369,13 +398,15 @@ class BlockDiag(CompositeOperator):
             w += child.shape[1]
         return h, w
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         h_offset, w_offset = 0, 0
         for C in self._children:
             h, w = C.shape if forward else reversed(C.shape)
             slc_x = slice( w_offset, w_offset+w )
             slc_y = slice( h_offset, h_offset+h )
-            C.eval( y[slc_y,:], x[slc_x,:], alpha=alpha, beta=beta, forward=forward)
+            C.eval( y[slc_y,:], x[slc_x,:], alpha=alpha, beta=beta, forward=forward, left=left)
             h_offset += h
             w_offset += w
 
@@ -389,27 +420,29 @@ class VStack(CompositeOperator):
             w  = child.shape[1]
         return h, w
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         if forward:
-            return self._eval_forward(y, x, alpha, beta)
+            return self._eval_forward(y, x, alpha, beta, left=left)
         else:
-            return self._eval_adjoint(y, x, alpha, beta)
+            return self._eval_adjoint(y, x, alpha, beta, left=left)
 
-    def _eval_forward(self, y, x, alpha=1, beta=0):
+    def _eval_forward(self, y, x, alpha=1, beta=0, left=True):
         h_offset = 0
         for C in self._children:
             h = C.shape[0]
             slc = slice( h_offset, h_offset+h )
-            C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=True)
+            C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=True, left=left)
             h_offset += h
 
-    def _eval_adjoint(self, y, x, alpha=1, beta=0):
+    def _eval_adjoint(self, y, x, alpha=1, beta=0, left=True):
         self._backend.scale(y, beta)
         w_offset = 0
         for C in self._children:
             w = C.shape[0]
             slc = slice( w_offset, w_offset+w )
-            C.eval( y, x[slc,:], alpha=alpha, beta=1, forward=False)
+            C.eval( y, x[slc,:], alpha=alpha, beta=1, forward=False, left=left)
             w_offset += w
 
     def _adopt(self, children):
@@ -430,27 +463,29 @@ class HStack(CompositeOperator):
             w += child.shape[1]
         return h, w
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         if forward:
-            return self._eval_forward(y, x, alpha, beta)
+            return self._eval_forward(y, x, alpha, beta, left=left)
         else:
-            return self._eval_adjoint(y, x, alpha, beta)
+            return self._eval_adjoint(y, x, alpha, beta, left=left)
 
-    def _eval_forward(self, y, x, alpha=1, beta=0):
+    def _eval_forward(self, y, x, alpha=1, beta=0, left=True):
         self._backend.scale(y, beta)
         w_offset = 0
         for C in self._children:
             w = C.shape[1]
             slc = slice( w_offset, w_offset+w )
-            C.eval( y, x[slc,:], alpha=alpha, beta=1, forward=True)
+            C.eval( y, x[slc,:], alpha=alpha, beta=1, forward=True, left=left)
             w_offset += w
 
-    def _eval_adjoint(self, y, x, alpha=1, beta=0):
+    def _eval_adjoint(self, y, x, alpha=1, beta=0, left=True):
         w_offset = 0
         for C in self._children:
             w = C.shape[1]
             slc = slice( w_offset, w_offset+w )
-            C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=False)
+            C.eval( y[slc,:], x, alpha=alpha, beta=beta, forward=False, left=left)
             w_offset += w
 
     def _adopt(self, children):
@@ -462,25 +497,17 @@ class HStack(CompositeOperator):
         super()._adopt(children)
 
 
-class Product(CompositeOperator):
+class Product(BinaryOperator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._intermediate = None
         self._name = "{}*{}".format(self.left._name, self.right._name)
-
-    @property
-    def left(self):
-        return self._children[0]
-
-    @property
-    def right(self):
-        return self._children[1]
 
     @property
     def shape(self):
         h = self.left.shape[0]
         w = self.right.shape[1]
         return h, w
+
 
     def _adopt(self, children):
         L, R = children
@@ -489,15 +516,17 @@ class Product(CompositeOperator):
                 L.shape, R.shape, L._name, R._name))
         super()._adopt(children)
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         L, R = self._children
         with self._backend.scratch(shape=(R.shape[0],x.shape[1])) as tmp:
             if forward:
-                R.eval(tmp, x, alpha=alpha, beta=0, forward=True)
-                L.eval(y, tmp, alpha=1,  beta=beta, forward=True)
+                R.eval(tmp, x, alpha=alpha, beta=0, forward=True, left=left)
+                L.eval(y, tmp, alpha=1,  beta=beta, forward=True, left=left)
             else:
-                L.eval(tmp, x, alpha=alpha, beta=0, forward=False)
-                R.eval(y, tmp, alpha=1,  beta=beta, forward=False)
+                L.eval(tmp, x, alpha=alpha, beta=0, forward=False, left=left)
+                R.eval(y, tmp, alpha=1,  beta=beta, forward=False, left=left)
 
     def _mem_usage(self, ncols):
         ncols = min(ncols, self._batch or ncols)
@@ -529,10 +558,12 @@ class Sum(CompositeOperator):
                 L.shape, R.shape, L._name, R._name))
         super()._adopt(children)
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         L, R = self._children
-        R.eval(y, x, alpha=alpha, beta=beta, forward=forward)
-        L.eval(y, x, alpha=alpha, beta=1.0,  forward=forward)
+        R.eval(y, x, alpha=alpha, beta=beta, forward=forward, left=left)
+        L.eval(y, x, alpha=alpha, beta=1.0,  forward=forward, left=left)
 
     def _mem_usage(self, ncols):
         return 0
@@ -552,13 +583,17 @@ class Scale(CompositeOperator):
     def dtype(self):
         return self.child.dtype
 
-    def _eval(self, y, x, alpha=1, beta=0, forward=True):
+    def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         a = alpha * (self._val if forward else np.conj(self._val))
-        self.child.eval(y, x, alpha=a, beta=beta, forward=forward)
+        self.child.eval(y, x, alpha=a, beta=beta, forward=forward, left=left)
 
 
 class One(MatrixFreeOperator):
-    def _eval(self, y, x, alpha=1, beta=0, forward=None):
+    def _eval(self, y, x, alpha=1, beta=0, forward=None, left=True):
+        if not left:
+            raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
         nbytes = (0 if alpha == 0 else x.nbytes) + \
                  (0 if beta == 0 else y.nbytes)
         with profile("onemm", nbytes=nbytes) as p:

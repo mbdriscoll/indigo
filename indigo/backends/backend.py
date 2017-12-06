@@ -47,7 +47,7 @@ class Backend(object):
             self.dtype = dtype
             self.shape = shape
             self._backend = backend
-            self._leading_dims = ld or shape
+            self._leading_dim = ld or shape[0]
             self._own = own
             assert isinstance(backend, Backend), type(backend)
             if data is None:
@@ -57,10 +57,36 @@ class Backend(object):
                 self._arr = data
 
         def reshape(self, new_shape):
-            assert -1 not in new_shape
+            old_shape = self.shape
+            old_leading_dim = self._leading_dim
+            if (-1) in new_shape:
+                one = new_shape.index(-1)
+                new_size = -int(np.prod(new_shape))
+                old_size = self.size
+                factor = old_size // new_size
+                assert new_size * factor == old_size, \
+                    "Cannot reshape {} into {}. (size mismatch)".format(old_shape, new_shape)
+                new_shape = list(new_shape)
+                new_shape[one] = factor
+                new_shape = tuple(new_shape)
+            if new_shape[0] > old_shape[0]:
+                contig = old_shape[0] == self._leading_dim
+                assert contig, "Cannot stack non-contiguous columns."
             assert np.prod(new_shape) == self.size
+            # min for Kron -- make new lda
+            # max for VStack -- preserve original lda
+            #new_leading_dim = min(new_shape[0], old_leading_dim) # FIXME: need consistent semantics for reshape
+            #new_leading_dim = old_leading_dim # works with VStack
+            #new_leading_dim = new_shape[0] # works with Kron
+
+            if new_shape[0] < old_shape[0]:
+                #assert self.contiguous, "Cannot stack vectors of non-contiguous matrix."
+                new_leading_dim = new_shape[0]
+            else:
+                new_leading_dim = old_leading_dim
+
             return self._backend.dndarray( self._backend,
-                new_shape, dtype=self.dtype, own=False, data=self._arr)
+                new_shape, dtype=self.dtype, ld=new_leading_dim, own=False, data=self._arr)
 
         @property
         def size(self):
@@ -77,6 +103,13 @@ class Backend(object):
         @property
         def ndim(self):
             return len(self.shape)
+
+        @property
+        def contiguous(self):
+            if self.ndim == 1:
+                return True
+            else:
+                return self._leading_dim == self.shape[0]
 
         def copy_from(self, arr):
             ''' copy from device when both arrays exist '''
@@ -194,6 +227,9 @@ class Backend(object):
         d_arr._zero()
         return d_arr
 
+    def zeros_like(self, other, name=''):
+        return self.zero_array(other.shape, other.dtype, name=name)
+
     def empty_array(self, shape, dtype, name=''):
         d_arr = self.dndarray(self, shape, dtype, name=name)
         return d_arr
@@ -274,7 +310,12 @@ class Backend(object):
 
     def KronI(self, c, B, **kwargs):
         """ C := I_c (KRON) B """
-        return op.KronI(self, c, B, **kwargs)
+        I = self.Eye(c)
+        return op.Kron(self, I, B, **kwargs)
+
+    def Kron(self, A, B, **kwargs):
+        """ C := A (KRON) B """
+        return op.Kron(self, A, B, **kwargs)
 
     def BlockDiag(self, Ms, **kwargs):
         return op.BlockDiag(self, *Ms, **kwargs)
@@ -431,6 +472,12 @@ class Backend(object):
     def cgemm(self, y, M, x, alpha, beta, forward):
         """
         Peform a dense matrix-matrix multiplication.
+        """
+        raise NotImplementedError()
+
+    def csymm(self, y, M, x, alpha, beta, left=True):
+        """
+        Peform a symmetric dense matrix-matrix multiplication for real symmetric matrices.
         """
         raise NotImplementedError()
 
