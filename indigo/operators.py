@@ -311,7 +311,8 @@ class UnscaledFFT(MatrixFreeOperator):
     def _eval(self, y, x, alpha=1, beta=0, forward=True, left=True):
         if not left:
             raise NotImplementedError("Right-multiplication not implemented for {}.".format(self.__class__.__name__))
-        assert alpha == 1 and beta == 0
+        assert alpha == 1, "FFT expected alpha == 1, got %s" % alpha
+        assert  beta == 0, "FFT expected beta == 0, got %s" % beta
         X = x.reshape( self._ft_shape + (x.shape[1],) )
         Y = y.reshape( self._ft_shape + (x.shape[1],) )
 

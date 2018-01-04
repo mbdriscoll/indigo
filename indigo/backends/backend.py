@@ -49,7 +49,7 @@ class Backend(object):
             self._backend = backend
             self._leading_dim = ld or shape[0]
             self._own = own
-            assert isinstance(backend, Backend), type(backend)
+            #assert isinstance(backend, Backend), (backend, type(backend))
             if data is None:
                 self._arr = self._malloc(shape, dtype)
                 self._memory[ id(self._arr) ] = (name, shape, dtype)
@@ -352,7 +352,7 @@ class Backend(object):
         F = self.UnscaledFFT(shape, dtype, **kwargs)
         return S*F
 
-    def FFTc(self, ft_shape, dtype, **kwargs):
+    def FFTc(self, ft_shape, dtype, normalize=True, **kwargs):
         """ Centered, Unitary FFT """
         mod_slice = [ slice(d) for d in ft_shape ]
         idx = np.mgrid[mod_slice]
@@ -362,7 +362,10 @@ class Backend(object):
             mod += (idx[i] - c / 2.0) * (c / ft_shape[i])
         mod = np.exp(1j * 2.0 * np.pi * mod).astype(dtype)
         M = self.Diag(mod, name='mod')
-        F = self.FFT(ft_shape, dtype=dtype, **kwargs)
+        if normalize:
+            F = self.FFT(ft_shape, dtype=dtype, **kwargs)
+        else:
+            F = self.UnscaledFFT(ft_shape, dtype=dtype, **kwargs)
         return M*F*M
 
     def Zpad(self, M, N, mode='center', dtype=np.dtype('complex64'), **kwargs):
@@ -437,6 +440,12 @@ class Backend(object):
         R = self.Diag(r, name='apod')
 
         return G*F*Z*R
+
+    def Convolution(self, kernel, normalize=True, name='noname'):
+        F = self.FFTc(kernel.shape, name='%s.convF' % name, normalize=normalize, dtype=np.complex64)
+        K = self.Diag(F * kernel, name='%s.convK' % name)
+        I = self.Eye(F.shape[0])
+        return F.H * K * F
 
     # -----------------------------------------------------------------------
     # BLAS Routines
@@ -554,8 +563,8 @@ class Backend(object):
 
         def forward(self, y, x, alpha=1, beta=0):
             """ y[:] = A * x """
-            assert x.dtype == np.dtype("complex64")
-            assert y.dtype == np.dtype("complex64")
+            assert x.dtype == np.dtype("complex64"), "Bad dtype: expected compelx64, got %s" % x.dtype
+            assert y.dtype == np.dtype("complex64"), "Bad dtype: expected compelx64, got %s" % y.dtype
             assert self.values.dtype == np.dtype("complex64")
             self._backend.ccsrmm(y,
                 self.shape, self.colInds, self.rowPtrs, self.values,
@@ -563,8 +572,8 @@ class Backend(object):
 
         def adjoint(self, y, x, alpha=1, beta=0):
             """ y[:] = A.H * x """
-            assert x.dtype == np.dtype("complex64")
-            assert y.dtype == np.dtype("complex64")
+            assert x.dtype == np.dtype("complex64"), "Bad dtype: expected compelx64, got %s" % x.dtype
+            assert y.dtype == np.dtype("complex64"), "Bad dtype: expected compelx64, got %s" % y.dtype
             assert self.values.dtype == np.dtype("complex64")
             self._backend.ccsrmm(y,
                 self.shape, self.colInds, self.rowPtrs, self.values,
