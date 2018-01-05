@@ -13,7 +13,8 @@ install:
 - conda install -nroot conda-build=2.1.10
 - conda env create --quiet -n indigo -f requirements.txt python=3.5
 - source activate indigo
-- pip install .
+- python setup.py build
+- python setup.py install
 - export MKLROOT=$CONDA_PREFIX
 - wget -O scan.h5 "https://drive.google.com/uc?export=download&id=0B3gFEmaelkOoZEtvU19reklkamM"
 
