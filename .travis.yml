@@ -11,14 +11,14 @@ install:
 - conda update -q conda
 - conda info -a
 - conda install -nroot conda-build=2.1.10
-- conda env create -f requirements.txt python=3.5
+- conda env create --quiet -n indigo -f requirements.txt python=3.5
 - source activate indigo
 - conda develop -b .
 - export MKLROOT=$CONDA_PREFIX
 - wget -O scan.h5 "https://drive.google.com/uc?export=download&id=0B3gFEmaelkOoZEtvU19reklkamM"
 
 script:
-- pytest --cov=indigo
+- PYTHONPATH=. pytest --cov=indigo -x
 
 after_success:
   - coveralls

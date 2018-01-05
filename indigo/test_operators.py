@@ -3,6 +3,7 @@ import numpy as np
 import scipy.sparse as spp
 import numpy.testing as npt
 from itertools import product
+from scipy.signal import fftconvolve
 
 import indigo
 from indigo.backends import available_backends
@@ -639,3 +640,29 @@ def test_Kron_general(backend, L, Q, alpha, beta, eyeL, eyeR):
     K.eval(y_d, x_d, alpha=alpha, beta=beta, forward=False)
     y_act = y_d.to_host()
     npt.assert_allclose(vec(y_act), y_exp, rtol=1e-5)
+
+
+@pytest.mark.parametrize("backend,M,N,P",
+    product( BACKENDS, [23,45], [45,23], [1,2,3] ))
+def test_Convolution(backend, M, N, P):
+    from scipy.signal import fftconvolve
+
+    b = backend()
+
+    #k = indigo.util.rand64c(M,N)
+    k = np.zeros((M,N), dtype=np.complex64)
+    k[M//2,N//2] = 1
+
+    C = b.Convolution(k)
+
+    x = indigo.util.rand64c(M,N,P)
+
+    y_act = C * x
+    y_act = y_act.reshape((M,N,-1), order='F')
+
+    y_exp = np.zeros((M,N,P), np.complex64)
+    for p in range(P):
+        y_exp[:,:,p] = fftconvolve( x[:,:,p], k, mode='same' )
+
+    pytest.xfail("under development")
+    #npt.assert_allclose(y_act, y_exp, rtol=1e-5)
