@@ -642,7 +642,6 @@ def test_Kron_general(backend, L, Q, alpha, beta, eyeL, eyeR):
     npt.assert_allclose(vec(y_act), y_exp, rtol=1e-5)
 
 
-@pytest.mark.skip("still under development")
 @pytest.mark.parametrize("backend,M,N,P",
     product( BACKENDS, [23,45], [45,23], [1,2,3] ))
 def test_Convolution(backend, M, N, P):
@@ -665,4 +664,5 @@ def test_Convolution(backend, M, N, P):
     for p in range(P):
         y_exp[:,:,p] = fftconvolve( x[:,:,p], k, mode='same' )
 
-    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+    pytest.xfail("under development")
+    #npt.assert_allclose(y_act, y_exp, rtol=1e-5)
