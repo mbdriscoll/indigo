@@ -439,6 +439,7 @@ class Backend(object):
         r = rolloff3(omin, width, beta, N)
         R = self.Diag(r, name='apod')
 
+        return G,F,Z,R
         return G*F*Z*R
 
     def Convolution(self, kernel, normalize=True, name='noname'):
@@ -683,48 +684,34 @@ class Backend(object):
             log.info("cg reached maxiter")
         x.copy_to(x_h)
 
-    def apgd(self, gradf, proxg, alpha, x_h, maxiter=100, team=None):
-        '''Accelerated proximal gradient descent.
-        Solves for min_x f(x) + g(x)
+    def apgd(self, gradf, proxg, alpha, x_h, maxiter=100, team=None, disp=None):
 
-        Parameters
-        ----------
-        gradf : Gradient of f
-        proxg : Proximal of g
-        alpha : Step size
-        x0 : 1D array, initial solution
-        maxiter : int, optional
-        '''
-        x_k = self.copy_array(x_h)
-        y_k = x_k.copy()
-        y_k1 = x_k.copy()
-        x_k1 = x_k.copy()
+        gfx = self.zeros_like(x_h)
+        x = self.copy_array(x_h)
+        z = x.copy()
+        t = 1.0
 
-        gf = x_k.copy()
+        for it in range(maxiter):
+            x, z = x, z
+            s = t
+            
+            gradf(gfx, x)
 
-        t_k = 1
+            self.axpby(1, x, -alpha, gfx)  # x = x - alpha * gfx
 
-        for it in range(1,maxiter+1):
-            profile.extra['it'] = it
+            if proxg is not None:
+                proxg(x, alpha)  # x = proxg(x)
 
-            with profile("iter"):
-                gradf(gf, y_k)
-                self.axpby(1, x_k, -alpha, gf)
+            t = (1.0 + (1.0 + 4.0 * t**2)**0.5) / 2.0
+            self.axpby((1.0 - s) / t, z, (s + t - 1.0) / t, x)
+                    
+            if disp is not None:
+                disp(x.to_host())
 
-                proxg(x_k, alpha)
+            print("this is new apgd")
 
-                t_k1 = (1.0 + np.sqrt(1.0 + 4.0 * t_k**2)) / 2.0
-
-                t_ratio = (t_k - 1) / t_k1
-                self.axpby(0, y_k1, 1+t_ratio, x_k)
-                self.axpby(1, y_k1,  -t_ratio, x_k1)
-
-                x_k1.copy(x_k)
-                y_k.copy(y_k1)
-
-            log.info("iter %d", it)
-
-        x_k.copy_to(x_h)
+        x.copy_to(x_h)
+        return x_h
 
     def max(self, val, arr):
         """ Computes elementwise maximum: arr[:] = max(arr, val). """
