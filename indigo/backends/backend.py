@@ -708,8 +708,6 @@ class Backend(object):
             if disp is not None:
                 disp(x.to_host())
 
-            print("this is new apgd")
-
         x.copy_to(x_h)
         return x_h
 
