@@ -692,7 +692,7 @@ class Backend(object):
         t = 1.0
 
         for it in range(maxiter):
-            x, z = x, z
+            x, z = z, x
             s = t
             
             gradf(gfx, x)
