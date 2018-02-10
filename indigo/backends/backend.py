@@ -350,6 +350,7 @@ class Backend(object):
         s = np.ones(n, order='F', dtype=dtype) / np.sqrt(n)
         S = self.Diag(s, name='scale')
         F = self.UnscaledFFT(shape, dtype, **kwargs)
+        return S,F # FIXME
         return S*F
 
     def FFTc(self, ft_shape, dtype, normalize=True, **kwargs):
@@ -363,9 +364,11 @@ class Backend(object):
         mod = np.exp(1j * 2.0 * np.pi * mod).astype(dtype)
         M = self.Diag(mod, name='mod')
         if normalize:
-            F = self.FFT(ft_shape, dtype=dtype, **kwargs)
+            U, F = self.FFT(ft_shape, dtype=dtype, **kwargs)
+            return M,U,F,M # FIXME
         else:
             F = self.UnscaledFFT(ft_shape, dtype=dtype, **kwargs)
+            return M,F,M # FIXME
         return M*F*M
 
     def Zpad(self, M, N, mode='center', dtype=np.dtype('complex64'), **kwargs):
@@ -430,7 +433,7 @@ class Backend(object):
         oN = tuple(int(on) for on in oN)
 
         Z = self.Zpad(oN, N, dtype=dtype, name='zpad')
-        F = self.FFTc(oN, dtype=dtype, name='fft')
+        M1,U,F,M2 = self.FFTc(oN, dtype=dtype, name='fft')
 
         beta = np.pi * np.sqrt(((width * 2. / omin) * (omin- 0.5)) ** 2 - 0.8)
         kb = signal.kaiser(2 * n + 1, beta)[n:]
@@ -439,7 +442,7 @@ class Backend(object):
         r = rolloff3(omin, width, beta, N)
         R = self.Diag(r, name='apod')
 
-        return G,F,Z,R
+        return G,M1,U,F,M2,Z,R # FIXME
         return G*F*Z*R
 
     def Convolution(self, kernel, normalize=True, name='noname'):

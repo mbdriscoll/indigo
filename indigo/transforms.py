@@ -136,7 +136,7 @@ class RealizeMatrices(Transform):
         node = self.generic_visit(node)
         L, R = node.children
         if isinstance(L, Eye):
-            L = L.realize()
+            return node._backend.BlockDiag([R]*L.shape[0]).realize()
         if isinstance(L, SpMatrix) and isinstance(R, SpMatrix):
             name = "({}(x){})".format(L._name, R._name)
             log.debug('realizing kron %s x %s', L._name, R._name)
