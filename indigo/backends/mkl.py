@@ -66,7 +66,7 @@ class MklBackend(Backend):
             self._arr[:] = 0
 
         def __getitem__(self, slc):
-            d = self._arr[slc]
+            d = self._arr.reshape(self.shape, order='F')[slc]
             return self._backend.dndarray( self._backend, d.shape, d.dtype,
                 ld=self._leading_dim, own=False, data=d )
 
