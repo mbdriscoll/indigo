@@ -406,7 +406,7 @@ class Backend(object):
     def NUFFT(self, M, N, coord, width=3, n=128, oversamp=None, dtype=np.dtype('complex64'), **kwargs):
         assert len(M) == 3
         assert len(N) == 3
-        assert M[1:] == coord.shape[1:]
+        assert M[1:] == coord.shape[1:], (M, coord.shape)
 
         # target 448 x 270 x 640
         #   448 x 270 x 640   mkl-batch: 170.83 ms, 237.51 gflop/s  back-to-back: 121.76 ms, 333.23 gflop/s
@@ -686,6 +686,14 @@ class Backend(object):
         else:
             log.info("cg reached maxiter")
         x.copy_to(x_h)
+
+    def power(self, A, x_h, maxiter=10):
+        x = self.copy_array(x_h)
+        for it in range(maxiter):
+            A.eval(x, x)
+            s = np.sqrt(self.norm2(x))
+            self.scale(x, 1/s)
+        return s, x
 
     def apgd(self, gradf, proxg, alpha, x_h, maxiter=100, team=None, disp=None):
 
