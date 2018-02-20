@@ -115,6 +115,15 @@ class Operator(object):
         from indigo.analyses import TreeHasOp
         return TreeHasOp(op_classes).search(self)
 
+    def save(self, fname):
+        from pickle import dump
+        dump(self, fname)
+
+    @staticmethod
+    def load(fname):
+        from pickle import load
+        return load(fname)
+
 
 class CompositeOperator(Operator):
     def __init__(self, backend, *children, **kwargs):
@@ -199,6 +208,7 @@ class SpMatrix(Operator):
         """
         super().__init__(backend, **kwargs)
         assert isinstance(M, spp.spmatrix)
+
         self._matrix = M
         self._matrix_d = None
 

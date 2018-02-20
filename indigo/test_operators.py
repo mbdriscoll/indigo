@@ -3,10 +3,13 @@ import numpy as np
 import scipy.sparse as spp
 import numpy.testing as npt
 from itertools import product
+from tempfile import TemporaryFile
 from scipy.signal import fftconvolve
 
 import indigo
+from indigo.operators import Operator
 from indigo.backends import available_backends
+
 BACKENDS = available_backends()
 
 @pytest.mark.parametrize("backend,M,N,K,density,alpha,beta",
@@ -646,7 +649,6 @@ def test_Kron_general(backend, L, Q, alpha, beta, eyeL, eyeR):
     product( BACKENDS, [23,45], [45,23], [1,2,3] ))
 def test_Convolution(backend, M, N, P):
     from scipy.signal import fftconvolve
-
     b = backend()
 
     #k = indigo.util.rand64c(M,N)
@@ -666,3 +668,55 @@ def test_Convolution(backend, M, N, P):
 
     pytest.xfail("under development")
     #npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+
+
+@pytest.mark.parametrize("backend,M,N,K,density,alpha,beta",
+    product( BACKENDS, [3,4], [7,8], [1,8,9,17], [0.01,0.1,0.5,1], [0,.5,1], [0,.5,1] ))
+def test_pickle(backend, M, N, K, density, alpha, beta):
+    A_h = indigo.util.randM(M, N, density)
+    x = indigo.util.rand64c(N,K)
+    y = indigo.util.rand64c(M,K)
+
+    def test_b0():
+        b0 = backend()
+        A = b0.SpMatrix(A_h, name='A0')
+
+        from tempfile import NamedTemporaryFile
+        with NamedTemporaryFile(delete=False) as f:
+            A.save(f)
+
+        x_d = b0.copy_array(x)
+        y_d = b0.copy_array(y)
+        x_exp_d = b0.copy_array(x)
+        y_exp_d = b0.copy_array(y)
+
+        A.eval(y_exp_d, x_d, alpha=alpha, beta=beta)
+        A.H.eval(x_exp_d, y_d, alpha=alpha, beta=beta)
+
+        x_exp = x_exp_d.to_host()
+        y_exp = y_exp_d.to_host()
+
+        del b0
+
+        return f.name, x_exp, y_exp
+
+    def test_b1(fname):
+        with open(fname, 'rb') as f:
+            B = Operator.load(f)
+        b1 = B._backend
+
+        x_d = b1.copy_array(x)
+        y_d = b1.copy_array(y)
+        x_act_d = b1.copy_array(x)
+        y_act_d = b1.copy_array(y)
+
+        B.eval(y_act_d, x_d, alpha=alpha, beta=beta)
+        B.H.eval(x_act_d, y_d, alpha=alpha, beta=beta)
+
+        return x_act_d.to_host(), y_act_d.to_host()
+
+    saved, x_exp, y_exp = test_b0()
+    x_act, y_act = test_b1(saved)
+
+    npt.assert_allclose(y_act, y_exp, rtol=1e-5)
+    npt.assert_allclose(x_act, x_exp, rtol=1e-5)
