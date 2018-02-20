@@ -695,7 +695,7 @@ class Backend(object):
             self.scale(x, 1/s)
         return s, x
 
-    def apgd(self, gradf, proxg, alpha, x_h, maxiter=100, team=None, disp=None):
+    def apgd(self, gradf, proxg, alpha, x_h, maxiter=100, disp=None):
 
         gfx = self.zeros_like(x_h)
         x = self.copy_array(x_h)
@@ -703,21 +703,26 @@ class Backend(object):
         t = 1.0
 
         for it in range(maxiter):
-            x, z = z, x
-            s = t
-            
-            gradf(gfx, x)
+            profile.extra['it'] = it
+            with profile("iter"):
 
-            self.axpby(1, x, -alpha, gfx)  # x = x - alpha * gfx
+                    x, z = z, x
+                    s = t
 
-            if proxg is not None:
-                proxg(x, alpha)  # x = proxg(x)
+                    with profile("linop"):
+                        gradf(gfx, x)
 
-            t = (1.0 + (1.0 + 4.0 * t**2)**0.5) / 2.0
-            self.axpby((1.0 - s) / t, z, (s + t - 1.0) / t, x)
-                    
-            if disp is not None:
-                disp(x.to_host())
+                    self.axpby(1, x, -alpha, gfx)  # x = x - alpha * gfx
+
+                    with profile("prox"):
+                        if proxg is not None:
+                            proxg(x, alpha)  # x = proxg(x)
+
+                    t = (1.0 + (1.0 + 4.0 * t**2)**0.5) / 2.0
+                    self.axpby((1.0 - s) / t, z, (s + t - 1.0) / t, x)
+
+                    if disp is not None:
+                        disp(x.to_host())
 
         x.copy_to(x_h)
         return x_h
