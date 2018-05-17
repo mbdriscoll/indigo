@@ -553,13 +553,18 @@ class Backend(object):
             self.dtype = A.dtype
 
             # fraction of nonzero rows/columns
-            from indigo.backends._customcpu import inspect
-            nzrow, nzcol, self._exwrite = inspect(A.shape[0], A.shape[1], A.indices, A.indptr)
-            self._row_frac = nzrow / A.shape[0]
-            self._col_frac = nzcol / A.shape[1]
-            log.debug("matrix %s has %2d%% nonzero rows and %2d%% nonzero columns",
-                name, 100*self._row_frac, 100*self._col_frac)
-            log.debug("matrix %s supports exwrite: %s", name, self._exwrite)
+            try:
+                from indigo.backends._customcpu import inspect
+                nzrow, nzcol, self._exwrite = inspect(A.shape[0], A.shape[1], A.indices, A.indptr)
+                self._row_frac = nzrow / A.shape[0]
+                self._col_frac = nzcol / A.shape[1]
+                log.debug("matrix %s has %2d%% nonzero rows and %2d%% nonzero columns",
+                    name, 100*self._row_frac, 100*self._col_frac)
+                log.debug("matrix %s supports exwrite: %s", name, self._exwrite)
+            except ImportError:
+                self._row_frac = 1.0
+                self._col_frac = 1.0
+                log.debug("skipping exwrite inspection. Is CustomCPU backend available?")
 
         def forward(self, y, x, alpha=1, beta=0):
             """ y[:] = A * x """
